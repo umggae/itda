@@ -22,10 +22,10 @@ export function validatePlan(plan) {
     add('mode', '이동수단을 대중교통 또는 자동차 중에서 선택해 주세요.');
   }
   if (!plan.originId) {
-    add('origin', '출발지가 없습니다. 거점 목록에서 출발지를 선택해 주세요.');
+    add('origin', '출발지가 없습니다. 위 검색칸에서 출발지를 검색해 선택해 주세요.');
   }
   if (!plan.destinationId) {
-    add('destination', '도착지가 없습니다. 거점 목록에서 도착지를 선택해 주세요.');
+    add('destination', '도착지가 없습니다. 위 검색칸에서 도착지를 검색해 선택해 주세요.');
   }
 
   const start = parseTime(plan.startTime);
