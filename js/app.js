@@ -967,6 +967,14 @@ $('search-btn').addEventListener('click', () => {
   doSearch();
 });
 for (const role of ['origin', 'destination']) $(role).addEventListener('change', updateMap);
+// 검색칸을 고치거나 지우면(× 버튼 포함) 이전 검색 결과 목록은 치운다. 입력 중에는 자동완성 추천만 보이고,
+// 결과 목록은 "검색"을 눌렀을 때만 나타난다.
+for (const eventName of ['input', 'search']) {
+  $('place-query').addEventListener(eventName, () => {
+    $('search-results').replaceChildren();
+    $('stops-note').hidden = true;
+  });
+}
 $('save-btn').addEventListener('click', saveCurrentPlan);
 $('update-btn').addEventListener('click', updateSavedPlan);
 $('menu-btn').addEventListener('click', openSaved);

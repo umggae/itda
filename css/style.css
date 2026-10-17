@@ -150,6 +150,7 @@ button.primary:hover { background: var(--accent-dark); }
   display: flex; justify-content: space-between; align-items: center; gap: 8px;
   border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 8px 10px; margin-top: 6px;
 }
+.result-list li button { flex: none; white-space: nowrap; } /* 이름이 길어도 "추가" 글자가 세로로 깨지지 않게 */
 .tag { font-size: 0.82rem; color: var(--muted); overflow-wrap: anywhere; }
 
 /* ---------- 안내 상자 ---------- */
