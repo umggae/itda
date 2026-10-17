@@ -37,8 +37,10 @@ export function validatePlan(plan) {
   }
 
   const stops = plan.stops ?? [];
-  if (stops.length === 0) {
-    add('stops', '들를 장소가 0곳입니다. 장소를 한 곳 이상 추가해 주세요.');
+  // 경유지는 선택이다. 없으면 출발지에서 도착지로 가는 한 구간만 검사한다.
+  // 다만 경유지도 없는데 출발지와 도착지가 같으면 검사할 구간이 없다.
+  if (stops.length === 0 && plan.originId && plan.originId === plan.destinationId) {
+    add('destination', '출발지와 도착지가 같고 경유지도 없어서 검사할 구간이 없습니다. 도착지를 바꾸거나 경유지를 추가해 주세요.');
   }
   if (stops.length > MAX_STOPS) {
     add('stops', '장소는 하루 최대 ' + MAX_STOPS + '곳까지 추가할 수 있습니다. 일부를 빼 주세요.');

@@ -52,9 +52,13 @@ test('defaultStayMinutes: 음식점 30분, 그 외 60분', () => {
 test('validatePlan: 올바른 입력은 오류 없음', () => {
   assert.deepEqual(validatePlan(goodPlan()), []);
 });
-test('validatePlan: 장소 0곳', () => {
-  const errors = validatePlan({ ...goodPlan(), stops: [] });
-  assert.ok(errors.some((e) => e.field === 'stops'));
+test('validatePlan: 경유지 0곳이어도 출발지·도착지가 다르면 오류 없음(경유지는 선택)', () => {
+  assert.deepEqual(validatePlan({ ...goodPlan(), stops: [] }), []);
+});
+test('validatePlan: 경유지가 없는데 출발지와 도착지가 같으면 오류, 경유지가 있으면 왕복이라 허용', () => {
+  const errors = validatePlan({ ...goodPlan(), stops: [], destinationId: 'O' });
+  assert.ok(errors.some((e) => e.field === 'destination'));
+  assert.deepEqual(validatePlan({ ...goodPlan(), destinationId: 'O' }), []); // 경유지 1곳: 갔다 돌아오는 일정
 });
 test('validatePlan: 장소 7곳은 초과', () => {
   const stops = Array.from({ length: 7 }, (_, i) => ({ placeId: 'P' + i, stayMin: 30 }));
@@ -158,6 +162,17 @@ test('permutations: 개수는 n!', () => {
 test('permutations: 중복 없이 모두 다르다', () => {
   const keys = permutations(['a', 'b', 'c', 'd']).map((p) => p.join(''));
   assert.equal(new Set(keys).size, 24);
+});
+
+test('buildTimetable: 경유지 없이 출발지→도착지 한 구간만', () => {
+  const result = buildTimetable({
+    route: ['O', 'D'], stays: {}, startTime: '09:00', endTime: '21:00', legMinutes: table({ 'O>D': 45 }),
+  });
+  assert.equal(result.rows.length, 2);
+  assert.equal(result.legs.length, 1);
+  assert.equal(result.finishAt, 9 * 60 + 45);
+  assert.equal(result.totalTravel, 45);
+  assert.equal(result.feasible, true);
 });
 
 // ---------- 순서 제안 ----------

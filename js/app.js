@@ -470,6 +470,7 @@ function renderResult({ plan, route, timetable, legInfo, suggestion, details }) 
   // 가기 전 확인할 것
   const checklist = $('checklist');
   checklist.replaceChildren();
+  $('checklist-title').hidden = plan.stops.length === 0; // 경유지가 없으면 확인할 장소가 없다
   const rows = [
     ['쉬는 날', 'closedDays'],
     ['이용·영업시간', 'hours'],

@@ -74,14 +74,14 @@
           <div class="stop-block">
             <span class="dot dot-add" aria-hidden="true">+</span>
             <div class="stop-body">
-              <label for="place-query">경유지 추가 (하루 최대 6곳)</label>
+              <label for="place-query">경유지 추가 (선택, 하루 최대 6곳)</label>
               <div class="search-row">
                 <input id="place-query" type="search" placeholder="예: 경복궁" autocomplete="off" class="grow">
                 <button type="button" id="search-btn">검색</button>
               </div>
               <p id="stops-note" class="stops-note" role="status" aria-live="polite" hidden></p>
               <ul id="search-results" class="result-list" aria-label="검색 결과"></ul>
-              <p id="stops-empty" class="hint">아직 경유지가 없습니다. 장소를 검색해 추가해 주세요.</p>
+              <p id="stops-empty" class="hint">경유지는 선택입니다. 없으면 출발지에서 도착지까지 한 구간만 검사합니다.</p>
             </div>
           </div>
 
@@ -122,7 +122,7 @@
           실제 대기 시간은 0분부터 배차 간격 사이라고 생각해 주세요. "탑승 시간"은 차 안에 있는 시간이고, 도보·대기는 따로 계산됩니다.
         </p>
 
-        <h3>가기 전 확인할 것</h3>
+        <h3 id="checklist-title">가기 전 확인할 것</h3>
         <div id="checklist"></div>
 
         <h3>공유</h3>
