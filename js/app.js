@@ -257,15 +257,23 @@ async function doSearch() {
   }
 }
 
+// 경유지 추가가 막혔을 때의 안내. 맨 위 안내줄은 아래쪽에서 작업하면 안 보이므로 검색칸 바로 아래에도 보여 준다.
+function showStopNote(message) {
+  $('stops-note').textContent = message;
+  $('stops-note').hidden = message === '';
+  if (message) setStatus(message);
+}
+
 function addStop(place) {
   if (state.stops.length >= MAX_STOPS) {
-    setStatus('장소는 하루 최대 ' + MAX_STOPS + '곳까지입니다. 목록에서 하나를 빼고 추가해 주세요.');
+    showStopNote('경유지는 하루 최대 ' + MAX_STOPS + '곳까지입니다. 목록에서 하나를 빼고 추가해 주세요.');
     return;
   }
   if (state.stops.some((stop) => stop.placeId === place.id)) {
-    setStatus(place.name + '은(는) 이미 추가했습니다.');
+    showStopNote(place.name + '은(는) 이미 추가했습니다. 다른 장소를 골라 주세요.');
     return;
   }
+  showStopNote('');
   state.places[place.id] = place;
   state.stops.push({ placeId: place.id, stayText: String(defaultStayMinutes(place.category)) });
   renderStops();
@@ -331,6 +339,7 @@ function moveStop(index, delta, act) {
 
 function removeStop(index) {
   const [removed] = state.stops.splice(index, 1);
+  showStopNote(''); // 자리가 났으니 막힘 안내는 지운다
   renderStops();
   setStatus(nameOf(removed.placeId) + '을(를) 뺐습니다. 현재 ' + state.stops.length + '곳입니다.');
   $('place-query').focus();
