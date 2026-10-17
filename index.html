@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>잇다 — 여행 일정 검사</title>
+  <meta name="description" content="경유지가 여러 곳인 하루 여행 일정을 대중교통·자동차로 검사합니다. 구간별 소요시간과 대중교통 배차 간격을 한눈에 보여 줍니다.">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">본문으로 바로 가기</a>
+
+  <div class="layout">
+    <!-- 왼쪽: 경로 입력과 결과 / 오른쪽(모바일에서는 위): 지도 -->
+    <div class="panel" id="main">
+      <header class="brand">
+        <div class="brand-row">
+          <h1>잇다</h1>
+          <button type="button" id="menu-btn" class="menu-btn" aria-haspopup="dialog">
+            <span aria-hidden="true">☰</span> 저장한 일정 <span id="saved-count" class="badge">0</span>
+          </button>
+        </div>
+        <p>경유지가 여러 곳인 하루 일정을 대중교통으로도 검사해 보세요.</p>
+      </header>
+
+      <!-- 상태 메시지: 스크린 리더가 읽어 주는 영역 -->
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <p id="ac-status" class="sr-only" role="status" aria-live="polite"></p>
+      <section id="app-error" class="notice notice-error" role="alert" hidden></section>
+
+      <form id="plan-form" novalidate aria-label="일정 입력">
+        <fieldset class="tabs" id="mode">
+          <legend class="sr-only">이동수단</legend>
+          <label class="seg"><input type="radio" name="mode" value="transit" checked><span>대중교통</span></label>
+          <label class="seg"><input type="radio" name="mode" value="car"><span>자동차</span></label>
+        </fieldset>
+
+        <div class="when">
+          <div class="field">
+            <label for="date">날짜</label>
+            <input id="date" type="date">
+          </div>
+          <div class="field">
+            <label for="start">시작 시각</label>
+            <input id="start" type="time" value="09:00">
+          </div>
+          <div class="field">
+            <label for="end">종료 시각</label>
+            <input id="end" type="time" value="21:00">
+          </div>
+        </div>
+
+        <!-- 출발 → 경유 → 도착을 한 줄로 이은 경로 카드 -->
+        <div class="route-card">
+          <div class="stop-block">
+            <span class="dot dot-origin" aria-hidden="true">출</span>
+            <div class="stop-body">
+              <label for="origin-query">출발지 검색</label>
+              <div class="search-row">
+                <input id="origin-query" type="search" placeholder="예: 서울역, 홍대 호텔" autocomplete="off" class="grow">
+                <button type="button" id="origin-search">검색</button>
+              </div>
+              <label for="origin" class="sr-only">출발지 선택</label>
+              <select id="origin"><option value="">먼저 검색해 주세요</option></select>
+            </div>
+          </div>
+
+          <ol id="stops" class="stops" aria-label="경유지 (위에서부터 방문 순서)"></ol>
+
+          <div class="stop-block">
+            <span class="dot dot-add" aria-hidden="true">+</span>
+            <div class="stop-body">
+              <label for="place-query">경유지 추가 (하루 최대 6곳)</label>
+              <div class="search-row">
+                <input id="place-query" type="search" placeholder="예: 경복궁" autocomplete="off" class="grow">
+                <button type="button" id="search-btn">검색</button>
+              </div>
+              <ul id="search-results" class="result-list" aria-label="검색 결과"></ul>
+              <p id="stops-empty" class="hint">아직 경유지가 없습니다. 장소를 검색해 추가해 주세요.</p>
+            </div>
+          </div>
+
+          <div class="stop-block last">
+            <span class="dot dot-dest" aria-hidden="true">도</span>
+            <div class="stop-body">
+              <label for="destination-query">도착지 검색</label>
+              <div class="search-row">
+                <input id="destination-query" type="search" placeholder="예: 서울역, 강남역" autocomplete="off" class="grow">
+                <button type="button" id="destination-search">검색</button>
+              </div>
+              <label for="destination" class="sr-only">도착지 선택</label>
+              <select id="destination"><option value="">먼저 검색해 주세요</option></select>
+            </div>
+          </div>
+        </div>
+
+        <div id="errors" class="notice notice-error" role="alert" hidden></div>
+
+        <button type="submit" id="check-btn" class="primary">일정 검사하기</button>
+        <button type="button" id="save-btn" class="secondary">이 날짜 일정 저장</button>
+      </form>
+
+
+
+      <section id="result" aria-labelledby="result-title" hidden>
+        <h2 id="result-title">검사 결과</h2>
+        <div id="verdict" class="verdict"></div>
+        <div id="suggestion"></div>
+
+        <h3>일정 한눈에 보기</h3>
+        <ol id="timeline" class="timeline"></ol>
+        <p class="hint">
+          대중교통의 "배차 간격"은 해당 시간대의 예상 간격입니다(지하철처럼 정보가 없는 노선은 앞뒤 열차 시각으로 어림한 값이며 "(추정)"으로 표시합니다). 경유 일정은 시각이 조금씩 앞당겨지거나 늦어질 수 있으니,
+          실제 대기 시간은 0분부터 배차 간격 사이라고 생각해 주세요. "탑승 시간"은 차 안에 있는 시간이고, 도보·대기는 따로 계산됩니다.
+        </p>
+
+        <h3>가기 전 확인할 것</h3>
+        <div id="checklist"></div>
+
+        <h3>공유</h3>
+        <p class="hint">일정이 주소(링크)에 담깁니다. 서버에 저장하지 않으며 이름 같은 개인정보는 담기지 않습니다.</p>
+        <button type="button" id="share-btn">공유 링크 만들기</button>
+        <div id="share-box" hidden>
+          <label for="share-url">공유 링크</label>
+          <div class="search-row">
+            <input id="share-url" type="text" readonly class="grow">
+            <button type="button" id="copy-btn">복사</button>
+          </div>
+        </div>
+      </section>
+
+      <footer class="site-footer">
+        <p id="data-note"></p>
+        <p>지도: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> 기여자, <a href="https://leafletjs.com">Leaflet</a></p>
+        <p>길찾기 링크는 카카오맵으로 연결됩니다. 이동시간은 참고용 예상치입니다. 대중교통은 입력한 날짜·시작 시각의 시간표 기준이며, 자동차는 조회 시점의 교통 기준입니다.</p>
+      </footer>
+    </div>
+
+    <aside class="map-pane" aria-label="지도">
+      <div id="map" role="img" aria-label="출발지, 경유지, 도착지를 순서대로 이은 지도"></div>
+      <p class="map-note">지도의 선은 장소를 직선으로 이은 것이며 실제 이동 경로가 아닙니다.</p>
+    </aside>
+  </div>
+
+  <!-- 저장한 일정 메뉴: 왼쪽에서 열리는 서랍 창. <dialog>라서 열려 있는 동안 초점이 창 안에 머물고 Esc로 닫힌다. -->
+  <dialog id="saved-dialog" class="drawer" aria-labelledby="saved-title">
+    <div class="drawer-head">
+      <h2 id="saved-title">저장한 일정</h2>
+      <button type="button" id="saved-close">닫기</button>
+    </div>
+    <div class="drawer-body">
+      <p id="saved-status" class="status" role="status" aria-live="polite"></p>
+      <ul id="saved-list" class="saved-list"></ul>
+      <p id="saved-empty" class="hint">아직 저장한 일정이 없습니다. 일정을 입력하고 "이 날짜 일정 저장"을 눌러 보세요.</p>
+      <p class="hint">
+        날짜별로 이 브라우저에 저장됩니다(서버에는 올라가지 않음). 같은 날짜에 다시 저장하면 덮어씁니다.
+        다른 기기로 옮기려면 검사 결과의 "공유 링크"를 쓰세요. 브라우저의 사이트 데이터를 지우면 함께 사라집니다.
+      </p>
+    </div>
+  </dialog>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

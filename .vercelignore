@@ -1,0 +1,6 @@
+.env*
+scripts/
+tests/
+docs/
+*.pdf
+개인프로젝트_기획서.html
