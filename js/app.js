@@ -975,6 +975,17 @@ for (const eventName of ['input', 'search']) {
     $('stops-note').hidden = true;
   });
 }
+// 이동수단에 따라 날짜·시각이 어떻게 쓰이는지 한 줄로 알려 준다. (자동차는 날짜를 바꿔도 결과가 같다)
+const MODE_HINTS = {
+  transit: '대중교통은 입력한 날짜·시작 시각의 시간표로 계산합니다. 오늘 기준 약 6일 전부터 99일 뒤까지의 날짜만 조회됩니다.',
+  car: '자동차 이동시간은 날짜·시각과 상관없이 조회하는 시점의 교통 기준입니다.',
+};
+function updateModeHint() {
+  const mode = document.querySelector('input[name="mode"]:checked')?.value ?? 'transit';
+  $('mode-hint').textContent = MODE_HINTS[mode];
+}
+document.querySelectorAll('input[name="mode"]').forEach((radio) => radio.addEventListener('change', updateModeHint));
+updateModeHint();
 $('save-btn').addEventListener('click', saveCurrentPlan);
 $('update-btn').addEventListener('click', updateSavedPlan);
 $('menu-btn').addEventListener('click', openSaved);
