@@ -465,6 +465,7 @@ function renderResult({ plan, route, timetable, legInfo, suggestion, details }) 
   renderSuggestion(suggestion, plan);
 
   renderTimeline(plan, timetable, legInfo);
+  $('transit-hint').hidden = plan.mode !== 'transit'; // 배차 간격·탑승 시간 설명은 대중교통 결과에만 보인다
 
   // 가기 전 확인할 것
   const checklist = $('checklist');
@@ -545,8 +546,8 @@ function renderLegCard(plan, leg, info, isProblem) {
         }
       }
     }
-  } else {
-    card.append(el('div', { class: 'leg-extra' }, info.summary));
+  } else if (plan.mode === 'transit') {
+    card.append(el('div', { class: 'leg-extra' }, info.summary)); // 노선 정보를 못 받았을 때의 기본 문구
   }
 
   if (isProblem) card.append(el('div', { class: 'badge-bad' }, '⚠ 이 구간에서 종료 시각을 넘깁니다'));
