@@ -11,7 +11,7 @@ import {
 } from './core/schedule.js';
 import { encodePlan, decodePlan } from './core/share.js';
 import { kakaoRouteUrl } from './core/mapLinks.js';
-import { savePlan, loadPlan, deletePlan, listPlans } from './core/savedPlans.js';
+import { savePlan, overwritePlan, loadPlan, deletePlan, listPlans, MAX_SAVED } from './core/savedPlans.js';
 import { attachAutocomplete } from './ui/autocomplete.js';
 import { REGION } from './core/region.js';
 
@@ -33,6 +33,7 @@ const state = {
   places: {}, // id → 장소 (이름·좌표를 보여 주려고 한 번 본 장소를 모아 둔다)
   stops: [], // [{ placeId, stayText }]
   lastCheck: null, // 마지막 검사의 입력(plan)
+  editingId: null, // 불러온(또는 방금 저장한) 일정의 번호
 };
 
 let map = null;
@@ -720,8 +721,9 @@ async function copyShareLink() {
   }
 }
 
-// ---------- 날짜별 저장 ----------
+// ---------- 일정 저장 ----------
 // 저장 장소는 이 브라우저의 localStorage. 막혀 있으면(시크릿 모드 등) 저장이 안 된다고 알려 준다.
+// 일정마다 고유 번호가 있어서 같은 날짜에도 여러 개 저장할 수 있다.
 function storage() {
   try {
     return window.localStorage;
@@ -735,6 +737,17 @@ function dateLabel(date) {
   return date.slice(0, 4) + '년 ' + day;
 }
 
+// 불러오거나 저장한 일정의 번호. 이 값이 있으면 "불러온 일정 덮어쓰기" 버튼이 나온다.
+function setEditing(id) {
+  state.editingId = id;
+  $('update-btn').hidden = id === null;
+}
+
+function stopSummary(names) {
+  if (names.length === 0) return '경유지 없음';
+  return '경유: ' + names.slice(0, 3).join(', ') + (names.length > 3 ? ' 외 ' + (names.length - 3) + '곳' : '');
+}
+
 function renderSaved() {
   const list = $('saved-list');
   list.replaceChildren();
@@ -742,47 +755,94 @@ function renderSaved() {
   const saved = store ? listPlans(store) : [];
   $('saved-empty').hidden = saved.length > 0;
   $('saved-count').textContent = String(saved.length);
+  if (state.editingId !== null && !saved.some((item) => item.id === state.editingId)) setEditing(null); // 지워진 일정
 
   for (const item of saved) {
-    const load = el('button', { type: 'button', 'aria-label': dateLabel(item.date) + ' 일정 불러오기' }, '불러오기');
-    const remove = el('button', { type: 'button', 'aria-label': dateLabel(item.date) + ' 일정 삭제' }, '삭제');
-    load.addEventListener('click', () => loadSaved(item.date));
+    const name = dateLabel(item.date) + ' ' + item.title;
+    const load = el('button', { type: 'button', 'aria-label': name + ' 일정 불러오기' }, '불러오기');
+    const remove = el('button', { type: 'button', 'aria-label': name + ' 일정 삭제' }, '삭제');
+    load.addEventListener('click', () => loadSaved(item.id));
     remove.addEventListener('click', () => {
-      if (!window.confirm(dateLabel(item.date) + ' 일정을 삭제할까요? 되돌릴 수 없습니다.')) return;
-      deletePlan(store, item.date);
+      if (!window.confirm(name + ' 일정을 삭제할까요? 되돌릴 수 없습니다.')) return;
+      deletePlan(store, item.id);
       renderSaved();
-      $('saved-status').textContent = dateLabel(item.date) + ' 일정을 삭제했습니다.'; // 창 안의 안내(창이 열려 있는 동안 바깥 안내는 읽히지 않음)
+      $('saved-status').textContent = name + ' 일정을 삭제했습니다.'; // 창 안의 안내(창이 열려 있는 동안 바깥 안내는 읽히지 않음)
       $('saved-close').focus();
     });
+    const editing = item.id === state.editingId ? el('span', { class: 'badge-edit' }, ' 편집 중') : '';
     list.append(
       el(
         'li',
         {},
-        el('div', {}, el('strong', {}, dateLabel(item.date)), el('div', { class: 'tag' }, item.title + ' · 경유 ' + item.stopCount + '곳')),
+        el(
+          'div',
+          { class: 'saved-info' },
+          el('strong', {}, dateLabel(item.date)),
+          editing,
+          el('div', {}, item.title),
+          el('div', { class: 'tag' }, stopSummary(item.stopNames)),
+        ),
         el('div', { class: 'saved-actions' }, load, remove),
       ),
     );
   }
 }
 
-// 지금 입력한 일정을 입력한 날짜 칸에 저장한다. 입력에 오류가 있으면 저장하지 않는다.
-function saveCurrentPlan() {
+// 입력 검사를 통과한 현재 일정을 돌려준다. 오류가 있으면 안내하고 null.
+function planToSave() {
   const plan = readPlan();
   const errors = validatePlan(plan);
   showErrors(errors);
   if (errors.length > 0) {
     document.querySelector('#errors a')?.focus();
     setStatus('입력에 문제가 있어 저장하지 못했습니다. 안내에 따라 고친 뒤 다시 저장해 주세요.');
-    return;
+    return null;
   }
+  return plan;
+}
+
+function showSaveProblem(result) {
+  showAppError(
+    result?.full
+      ? '저장한 일정이 ' + MAX_SAVED + '개로 가득 찼습니다. "저장한 일정" 메뉴에서 쓰지 않는 일정을 삭제한 뒤 다시 저장해 주세요.'
+      : '이 브라우저에서는 일정을 저장할 수 없습니다(시크릿 모드이거나 저장 공간이 막혀 있을 수 있습니다). 대신 "공유 링크 만들기"로 주소를 보관해 주세요.',
+  );
+}
+
+// 지금 입력한 일정을 "새 일정"으로 저장한다. 같은 날짜가 있어도 덮어쓰지 않는다.
+function saveCurrentPlan() {
+  const plan = planToSave();
+  if (!plan) return;
   const store = storage();
   const result = store ? savePlan(store, plan, state.places) : { ok: false };
   if (!result.ok) {
-    showAppError('이 브라우저에서는 일정을 저장할 수 없습니다(시크릿 모드이거나 저장 공간이 막혀 있을 수 있습니다). 대신 "공유 링크 만들기"로 주소를 보관해 주세요.');
+    showSaveProblem(result);
+    return;
+  }
+  setEditing(result.id);
+  renderSaved();
+  setStatus(
+    result.duplicate
+      ? '똑같은 일정이 이미 저장되어 있습니다.'
+      : dateLabel(plan.date) + ' 일정을 새로 저장했습니다. 위쪽 "저장한 일정" 메뉴에서 볼 수 있습니다.',
+  );
+}
+
+// 불러온(또는 방금 저장한) 일정의 내용을 지금 입력한 내용으로 바꾼다.
+function updateSavedPlan() {
+  const plan = planToSave();
+  if (!plan || state.editingId === null) return;
+  const store = storage();
+  const result = store ? overwritePlan(store, state.editingId, plan, state.places) : { ok: false };
+  if (!result.ok) {
+    if (result.found === false) {
+      setEditing(null);
+      setStatus('덮어쓸 일정을 찾지 못했습니다(이미 삭제됨). "새 일정으로 저장"을 눌러 주세요.');
+    } else showSaveProblem(result);
     return;
   }
   renderSaved();
-  setStatus(dateLabel(plan.date) + ' 일정을 ' + (result.replaced ? '덮어써서 ' : '') + '저장했습니다. 위쪽 "저장한 일정" 메뉴에서 볼 수 있습니다.');
+  setStatus('저장한 일정을 지금 내용으로 바꿨습니다(' + dateLabel(plan.date) + ').');
 }
 
 // 서랍 창 열기·닫기. 닫으면 브라우저가 열기 전에 있던 버튼으로 초점을 돌려 준다.
@@ -800,8 +860,8 @@ function closeSaved() {
   else dialog.removeAttribute('open');
 }
 
-function loadSaved(date) {
-  const plan = storage() && loadPlan(storage(), date);
+function loadSaved(id) {
+  const plan = storage() && loadPlan(storage(), id);
   if (!plan) {
     setStatus('저장된 일정을 읽지 못했습니다.');
     return;
@@ -809,9 +869,10 @@ function loadSaved(date) {
   closeSaved();
   remember(plan.places);
   fillForm(plan);
+  setEditing(id);
   $('result').hidden = true;
   showErrors([]);
-  setStatus(dateLabel(date) + ' 일정을 불러왔습니다. "일정 검사하기"를 눌러 다시 확인하세요.');
+  setStatus(dateLabel(plan.date) + ' 일정을 불러왔습니다. "일정 검사하기"를 눌러 다시 확인하세요. 고쳐서 저장할 때는 "불러온 일정 덮어쓰기"나 "새 일정으로 저장"을 고르세요.');
   $('check-btn').focus();
 }
 
@@ -898,6 +959,7 @@ $('search-btn').addEventListener('click', () => {
 });
 for (const role of ['origin', 'destination']) $(role).addEventListener('change', updateMap);
 $('save-btn').addEventListener('click', saveCurrentPlan);
+$('update-btn').addEventListener('click', updateSavedPlan);
 $('menu-btn').addEventListener('click', openSaved);
 $('saved-close').addEventListener('click', closeSaved);
 // 어두운 배경(창 바깥)을 누르면 닫는다. 배경 클릭은 dialog 요소 자체가 target이 된다.

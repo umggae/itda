@@ -3,6 +3,14 @@
 import { upstream, rateLimit, notConfigured } from '../lib/errors.js';
 import { REGION_BOX } from '../lib/validate.js';
 
+// 카카오 분류 코드 → 우리 분류. 관광명소(AT4)·문화시설(CT1)은 여행지, 음식점(FD6)·카페(CE7)는 음식점,
+// 나머지(역·터미널·숙소·기타)는 거점으로 둔다. 분류에 따라 체류시간 기본값(음식점 30분, 그 외 60분)이 정해진다.
+export function kakaoCategory(code) {
+  if (code === 'AT4' || code === 'CT1') return 'attraction';
+  if (code === 'FD6' || code === 'CE7') return 'restaurant';
+  return 'hub';
+}
+
 export function parseKakaoPlaces(bodyText) {
   let json;
   try {
@@ -21,8 +29,7 @@ export function parseKakaoPlaces(bodyText) {
       return {
         id: 'kakao-' + doc.id,
         name: doc.place_name,
-        // FD6 = 음식점. 나머지(역·터미널·숙소·기타)는 거점으로 둔다.
-        category: doc.category_group_code === 'FD6' ? 'restaurant' : 'hub',
+        category: kakaoCategory(doc.category_group_code),
         lat,
         lng,
         address: doc.road_address_name || doc.address_name || '',

@@ -99,7 +99,10 @@
         <div id="errors" class="notice notice-error" role="alert" hidden></div>
 
         <button type="submit" id="check-btn" class="primary">일정 검사하기</button>
-        <button type="button" id="save-btn" class="secondary">이 날짜 일정 저장</button>
+        <div class="save-row">
+          <button type="button" id="save-btn" class="secondary">새 일정으로 저장</button>
+          <button type="button" id="update-btn" class="secondary" hidden>불러온 일정 덮어쓰기</button>
+        </div>
       </form>
 
 
@@ -155,7 +158,8 @@
       <ul id="saved-list" class="saved-list"></ul>
       <p id="saved-empty" class="hint">아직 저장한 일정이 없습니다. 일정을 입력하고 "이 날짜 일정 저장"을 눌러 보세요.</p>
       <p class="hint">
-        날짜별로 이 브라우저에 저장됩니다(서버에는 올라가지 않음). 같은 날짜에 다시 저장하면 덮어씁니다.
+        이 브라우저에 저장됩니다(서버에는 올라가지 않음). 날짜가 같아도 "새 일정으로 저장"하면 여러 개가 남고,
+        불러온 일정을 고쳐서 저장할 때만 "불러온 일정 덮어쓰기"로 바꿀 수 있습니다(최대 50개).
         다른 기기로 옮기려면 검사 결과의 "공유 링크"를 쓰세요. 브라우저의 사이트 데이터를 지우면 함께 사라집니다.
       </p>
     </div>

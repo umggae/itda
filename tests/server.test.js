@@ -3,10 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ApiError } from '../server/lib/errors.js';
+import { dedupeSameName, rankPlaces } from '../server/lib/ranking.js';
 import { parseQuery, parseMode, parsePlaceId, parsePoints, parseWhen } from '../server/lib/validate.js';
 import { cacheGet, cacheSet, cached } from '../server/lib/cache.js';
 import { parseTourItems, toPlace, parseDetail, parseCommon } from '../server/clients/tourApi.js';
-import { parseKakaoPlaces } from '../server/clients/kakaoLocal.js';
+import { parseKakaoPlaces, kakaoCategory } from '../server/clients/kakaoLocal.js';
 import { parseCarRoute } from '../server/clients/kakaoMobility.js';
 import { parseTransitMatrix, parseTransitRides, nextDepartureGapMinutes } from '../server/clients/googleRoutes.js';
 
@@ -222,4 +223,33 @@ test('parseTransitRides: 승·하차 정류장 좌표를 뽑는다(환승 뒤 �
   assert.deepEqual(ride.fromLoc, { lat: 37.4768, lng: 126.9817 });
   assert.deepEqual(ride.toLoc, { lat: 37.49795, lng: 127.027637 });
   assert.equal(ride.rideMinutes, 9);
+});
+
+test('kakaoCategory: 관광명소·문화시설은 여행지, 음식점·카페는 음식점, 나머지는 거점', () => {
+  assert.equal(kakaoCategory('AT4'), 'attraction');
+  assert.equal(kakaoCategory('CT1'), 'attraction');
+  assert.equal(kakaoCategory('FD6'), 'restaurant');
+  assert.equal(kakaoCategory('CE7'), 'restaurant');
+  for (const other of ['SW8', 'AD5', 'HP8', '', undefined]) assert.equal(kakaoCategory(other), 'hub');
+});
+
+const place = (name, lat = 37.55, lng = 126.97) => ({ name, lat, lng });
+test('rankPlaces: 검색어와 같은 이름 → 검색어로 시작 → 포함 → 나머지, 같은 점수는 원래 순서(실제 사례: "서울역")', () => {
+  const ranked = rankPlaces(
+    [place('서울역 옥상정원(The Roof)'), place('브릭샌드 서울역점'), place('서울역'), place('서울 1호선')],
+    '서울역',
+  ).map((p) => p.name);
+  assert.deepEqual(ranked, ['서울역', '서울역 옥상정원(The Roof)', '브릭샌드 서울역점', '서울 1호선']);
+});
+test('rankPlaces: 같은 이름 둘이면 먼저 온 것(TourAPI)이 앞', () => {
+  const a = { ...place('경복궁'), id: 'tour' };
+  const b = { ...place('경복궁'), id: 'kakao' };
+  assert.deepEqual(rankPlaces([a, b], '경복궁').map((p) => p.id), ['tour', 'kakao']);
+});
+test('dedupeSameName: 이름이 같고 500m 안이면 먼저 온 것만, 멀리 있거나 이름이 다르면 둘 다', () => {
+  const a = { ...place('경복궁', 37.5796, 126.977), id: 'tour' };
+  const near = { ...place('경복궁', 37.5800, 126.9772), id: 'kakao' };
+  const far = { ...place('경복궁', 37.6500, 127.1), id: 'other' };
+  const diff = { ...place('경복궁 주차장', 37.5797, 126.9771), id: 'parking' };
+  assert.deepEqual(dedupeSameName([a, near, far, diff]).map((p) => p.id), ['tour', 'other', 'parking']);
 });

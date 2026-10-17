@@ -4,6 +4,7 @@ import { ApiError } from './lib/errors.js';
 import { parseQuery, parseMode, parsePlaceId, parsePoints, parseWhen } from './lib/validate.js';
 import { searchTour, tourDetail } from './clients/tourApi.js';
 import { searchKakao } from './clients/kakaoLocal.js';
+import { dedupeSameName, rankPlaces } from './lib/ranking.js';
 import { carMatrix } from './clients/kakaoMobility.js';
 import { transitMatrix, transitRides } from './clients/googleRoutes.js';
 
@@ -16,16 +17,9 @@ export async function search(params) {
   return cached('search:' + query, 10 * 60, async () => {
     const [tour, kakao] = await Promise.allSettled([searchTour(query), searchKakao(query)]);
     if (tour.status === 'rejected' && kakao.status === 'rejected') throw tour.reason;
-    // 같은 이름·같은 자리의 중복은 TourAPI 쪽을 남긴다.
-    const places = [...(tour.value ?? []), ...(kakao.value ?? [])];
-    const seen = new Set();
-    const unique = places.filter((place) => {
-      const key = place.name + '@' + place.lat.toFixed(3) + ',' + place.lng.toFixed(3);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    return { places: unique, partial: tour.status === 'rejected' || kakao.status === 'rejected' };
+    // 같은 이름·같은 자리의 중복은 TourAPI 쪽을 남기고, 검색어와 이름이 잘 맞는 것을 앞에 둔다(예: "서울역" → 역이 먼저).
+    const merged = dedupeSameName([...(tour.value ?? []), ...(kakao.value ?? [])]);
+    return { places: rankPlaces(merged, query).slice(0, 15), partial: tour.status === 'rejected' || kakao.status === 'rejected' };
   });
 }
 
