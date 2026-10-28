@@ -37,7 +37,6 @@ const state = {
 };
 
 let map = null;
-let mapLayer = null;
 
 function todayText() {
   const now = new Date();
@@ -645,33 +644,75 @@ function renderSuggestion(suggestion, plan) {
 
 // ---------- 지도 ----------
 // 지도는 처음부터 보이고, 출발지·경유지·도착지를 고를 때마다 핀이 바뀐다.
-function pin(kind, text) {
-  return L.divIcon({ className: '', html: '<div class="pin pin-' + kind + '">' + text + '</div>', iconSize: [30, 30], iconAnchor: [15, 15] });
+// 지도 도구는 MapLibre GL, 배경은 OpenFreeMap(OpenStreetMap 데이터, 인증키 없이 사용 가능)의 "positron" 스타일이다.
+// 기본 OpenStreetMap 지도는 글자와 색이 너무 많아 우리 핀과 경로가 묻혀서 바꿨다.
+const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/' + (['positron', 'liberty', 'bright'].includes(new URLSearchParams(location.search).get('tiles')) ? new URLSearchParams(location.search).get('tiles') : 'positron'); // ?tiles= 는 비교용(임시)
+
+let mapReady = false; // 지도 배경이 다 불러와졌는지
+let markers = []; // 지금 지도에 올려 둔 핀들
+let routeCoords = []; // 마지막으로 그린 경로 [[경도, 위도], ...] (MapLibre는 경도가 먼저)
+
+// 핀 하나. 번호·글자가 들어간 동그라미를 만들어 지도에 올린다. (이름은 textContent로만 넣어 안전하다)
+function makePin(kind, text, name) {
+  const element = document.createElement('div');
+  element.className = 'pin pin-' + kind;
+  element.textContent = text;
+  element.title = name;
+  return element;
 }
 
 function ensureMap() {
-  if (typeof L === 'undefined') {
+  if (typeof maplibregl === 'undefined') {
     $('map').textContent = '지도를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요. (일정 검사는 지도 없이도 사용할 수 있습니다.)';
     return false;
   }
   if (!map) {
-    map = L.map('map').setView(REGION.center, REGION.zoom); // 서비스 지역 중심
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(map);
+    map = new maplibregl.Map({
+      container: 'map',
+      style: MAP_STYLE_URL,
+      center: [REGION.center[1], REGION.center[0]], // 서비스 지역 중심
+      zoom: REGION.zoom,
+      attributionControl: { compact: true },
+    });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    map.on('load', () => {
+      // 배경 지도의 이름 표기는 기본이 "영어 + 현지어"라서 한국어 이름만 보이게 바꾼다.
+      for (const layer of map.getStyle().layers) {
+        const field = layer.layout?.['text-field'];
+        if (layer.type === 'symbol' && field && JSON.stringify(field).includes('name')) {
+          map.setLayoutProperty(layer.id, 'text-field', ['coalesce', ['get', 'name:ko'], ['get', 'name'], ['get', 'name_en']]);
+        }
+      }
+      // 경로선: 흰 바탕선 위에 점선을 얹어 어떤 배경에서도 또렷하게 보인다.
+      map.addSource('route', { type: 'geojson', data: routeGeoJson() });
+      const round = { 'line-cap': 'round', 'line-join': 'round' };
+      map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: round, paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.95 } });
+      map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: round, paint: { 'line-color': '#2f4fd0', 'line-width': 4, 'line-dasharray': [0.1, 2] } });
+      mapReady = true;
+    });
   }
   return true;
 }
 
+function routeGeoJson() {
+  return {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: routeCoords.length >= 2 ? routeCoords : [] },
+  };
+}
+
 // 마지막으로 그린 핀들이 한 화면에 들어오게 지도를 맞춘다.
-let lastPoints = [];
 function fitMap() {
   if (!map) return;
-  map.invalidateSize();
-  if (lastPoints.length >= 2) map.fitBounds(lastPoints, { padding: [40, 40] });
-  else if (lastPoints.length === 1) map.setView(lastPoints[0], 14);
-  else map.setView(REGION.center, REGION.zoom);
+  map.resize();
+  if (routeCoords.length >= 2) {
+    const bounds = routeCoords.reduce((box, point) => box.extend(point), new maplibregl.LngLatBounds(routeCoords[0], routeCoords[0]));
+    map.fitBounds(bounds, { padding: 60, maxZoom: 15, duration: 0 });
+  } else if (routeCoords.length === 1) {
+    map.jumpTo({ center: routeCoords[0], zoom: 14 });
+  } else {
+    map.jumpTo({ center: [REGION.center[1], REGION.center[0]], zoom: REGION.zoom });
+  }
 }
 
 // 지도 영역의 크기가 바뀌면(창 크기 조절, 휴대전화 회전, 숨겨져 있다가 나타남) 다시 맞춘다.
@@ -685,26 +726,30 @@ function watchMapSize() {
 // 지금 입력된 출발지 → 경유지 → 도착지를 지도에 그린다. (선택된 것만)
 function updateMap() {
   if (!ensureMap()) return;
-  if (mapLayer) mapLayer.remove();
-  mapLayer = L.layerGroup().addTo(map);
+  markers.forEach((marker) => marker.remove());
+  markers = [];
 
   const entries = [];
   const origin = state.places[$('origin').value];
   const destination = state.places[$('destination').value];
-  if (origin) entries.push({ place: origin, icon: pin('origin', '출') });
+  if (origin) entries.push({ place: origin, kind: 'origin', text: '출' });
   state.stops.forEach((stop, i) => {
     const place = state.places[stop.placeId];
-    if (place) entries.push({ place, icon: pin('stop', String(i + 1)) });
+    if (place) entries.push({ place, kind: 'stop', text: String(i + 1) });
   });
-  if (destination) entries.push({ place: destination, icon: pin('dest', '도') });
+  if (destination) entries.push({ place: destination, kind: 'dest', text: '도' });
 
-  const points = entries.map((entry) => [entry.place.lat, entry.place.lng]);
+  routeCoords = entries.map((entry) => [entry.place.lng, entry.place.lat]);
   entries.forEach((entry, i) => {
-    L.marker(points[i], { icon: entry.icon, title: entry.place.name, keyboard: false }).addTo(mapLayer).bindPopup(entry.place.name);
+    const marker = new maplibregl.Marker({ element: makePin(entry.kind, entry.text, entry.place.name) })
+      .setLngLat(routeCoords[i])
+      .setPopup(new maplibregl.Popup({ offset: 20 }).setText(entry.place.name))
+      .addTo(map);
+    markers.push(marker);
   });
-  if (points.length >= 2) L.polyline(points, { weight: 4, color: '#3050c8', opacity: 0.7, dashArray: '6 8' }).addTo(mapLayer);
 
-  lastPoints = points;
+  if (mapReady) map.getSource('route').setData(routeGeoJson());
+  else map.once('load', () => map.getSource('route').setData(routeGeoJson()));
   fitMap();
   watchMapSize();
 }
