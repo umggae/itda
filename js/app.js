@@ -277,6 +277,9 @@ function addStop(place) {
   state.places[place.id] = place;
   state.stops.push({ placeId: place.id, stayText: String(defaultStayMinutes(place.category)) });
   renderStops();
+  // 추가가 끝났으니 검색 결과 목록과 검색어를 비워 다음 검색을 준비한다.
+  $('search-results').replaceChildren();
+  $('place-query').value = '';
   setStatus(place.name + ' 추가됨. 현재 ' + state.stops.length + '곳입니다.');
 }
 
