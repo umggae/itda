@@ -50,6 +50,9 @@ export function validatePlan(plan) {
     const label = (index + 1) + '번째 장소';
     if (seen.has(stop.placeId)) add('stops', label + '가 이미 추가한 장소와 같습니다. 중복을 빼 주세요.');
     seen.add(stop.placeId);
+    // 출발지나 도착지와 같은 곳을 경유지로 넣으면 같은 장소끼리 잇는 구간이 생겨 계산할 수 없다.
+    if (stop.placeId === plan.originId) add('stops', label + '가 출발지와 같은 장소입니다. 출발지가 아닌 다른 곳을 경유지로 추가해 주세요.');
+    else if (stop.placeId === plan.destinationId) add('stops', label + '가 도착지와 같은 장소입니다. 도착지가 아닌 다른 곳을 경유지로 추가해 주세요.');
     const stay = stop.stayMin;
     if (typeof stay !== 'number' || !Number.isInteger(stay) || stay < 1 || stay > MAX_STAY_MINUTES) {
       add('stay-' + index, label + '의 체류시간은 1~' + MAX_STAY_MINUTES + ' 사이의 숫자(분)로 입력해 주세요.');

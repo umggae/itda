@@ -11,11 +11,13 @@ export function parseTime(text) {
   return hours * 60 + minutes;
 }
 
-// 분(숫자)을 "HH:MM" 문자열로 바꾼다. 24시를 넘으면 "25:10"처럼 그대로 보여 준다.
+// 분(숫자)을 "HH:MM" 문자열로 바꾼다. 24시를 넘으면 "28:00" 대신 "다음 날 04:00"처럼 읽기 쉽게 보여 준다.
 export function formatTime(totalMinutes) {
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
+  const days = Math.floor(totalMinutes / 1440);
+  const inDay = totalMinutes % 1440;
+  const clock = String(Math.floor(inDay / 60)).padStart(2, '0') + ':' + String(inDay % 60).padStart(2, '0');
+  if (days === 0) return clock;
+  return (days === 1 ? '다음 날 ' : days + '일 뒤 ') + clock;
 }
 
 // 분(숫자)을 "1시간 20분" 같은 읽기 쉬운 말로 바꾼다.

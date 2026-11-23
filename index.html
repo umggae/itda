@@ -61,7 +61,7 @@
             <div class="stop-body">
               <label for="origin-query">출발지 검색</label>
               <div class="search-row">
-                <input id="origin-query" type="search" placeholder="예: 서울역, 홍대 호텔" autocomplete="off" class="grow">
+                <input id="origin-query" type="search" maxlength="30" placeholder="예: 서울역, 홍대 호텔" autocomplete="off" class="grow">
                 <button type="button" id="origin-search">검색</button>
               </div>
               <label for="origin" class="sr-only">출발지 선택</label>
@@ -76,7 +76,7 @@
             <div class="stop-body">
               <label for="place-query">경유지 추가 (선택, 하루 최대 6곳)</label>
               <div class="search-row">
-                <input id="place-query" type="search" placeholder="예: 경복궁" autocomplete="off" class="grow">
+                <input id="place-query" type="search" maxlength="30" placeholder="예: 경복궁" autocomplete="off" class="grow">
                 <button type="button" id="search-btn">검색</button>
               </div>
               <p id="stops-note" class="stops-note" role="status" aria-live="polite" hidden></p>
@@ -90,7 +90,7 @@
             <div class="stop-body">
               <label for="destination-query">도착지 검색</label>
               <div class="search-row">
-                <input id="destination-query" type="search" placeholder="예: 서울역, 강남역" autocomplete="off" class="grow">
+                <input id="destination-query" type="search" maxlength="30" placeholder="예: 서울역, 강남역" autocomplete="off" class="grow">
                 <button type="button" id="destination-search">검색</button>
               </div>
               <label for="destination" class="sr-only">도착지 선택</label>

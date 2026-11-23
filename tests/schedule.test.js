@@ -36,7 +36,10 @@ test('parseTime: 잘못된 형식은 null', () => {
 });
 test('formatTime / formatDuration', () => {
   assert.equal(formatTime(570), '09:30');
-  assert.equal(formatTime(25 * 60 + 10), '25:10');
+  assert.equal(formatTime(25 * 60 + 10), '다음 날 01:10'); // 24시를 넘으면 28:00이 아니라 다음 날로 표시
+  assert.equal(formatTime(23 * 60 + 59), '23:59');
+  assert.equal(formatTime(24 * 60), '다음 날 00:00');
+  assert.equal(formatTime(2 * 1440 + 30), '2일 뒤 00:30');
   assert.equal(formatDuration(45), '45분');
   assert.equal(formatDuration(120), '2시간');
   assert.equal(formatDuration(80), '1시간 20분');
