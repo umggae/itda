@@ -5,6 +5,8 @@
 // storage는 localStorage처럼 getItem / setItem을 가진 것. 직접 넘겨 받아서 테스트에서는 가짜 저장소를 쓴다.
 import { encodePlan, decodePlan } from './share.js';
 
+// 키 이름의 "itda"는 서비스의 옛 이름(잇다)이다. 이름을 위시루트로 바꿨지만 키를 바꾸면
+// 사용자가 이미 저장한 일정이 보이지 않게 되므로 일부러 그대로 둔다.
 export const STORAGE_KEY = 'itda.savedPlans.v2';
 const OLD_STORAGE_KEY = 'itda.savedPlans.v1'; // 예전 방식(날짜당 1개). 처음 읽을 때 새 방식으로 옮긴다.
 export const MAX_SAVED = 50; // 브라우저 저장 공간을 지키려는 상한

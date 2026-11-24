@@ -1,8 +1,9 @@
-# wishroute (잇다)
+# 위시루트 (wishroute)
 
 서울에서 대중교통·자동차로 여러 경유지를 도는 하루 일정의 구간별 이동시간과 방문 순서를 검사하고 더 효율적인 순서를 제안하는 서비스. 자세한 내용은 `README.md` 참고.
 - 서비스: https://itda-rho.vercel.app/ (Vercel 배포)
 - 저장소: https://github.com/umggae/itda (로컬 폴더 이름은 wishroute)
+- 이름: 옛 이름은 "잇다". 이미 같은 이름의 유명한 사이트가 있어 2026-11-24에 "위시루트"로 바꿈. 화면·문서의 이름만 바꿨고 **주소(itda-rho.vercel.app), 저장소 이름(itda), 브라우저 저장 키(`itda.savedPlans.v2`), TourAPI 앱 이름(`MobileApp: 'Itda'`)은 그대로** 둠(바꾸면 기존 링크·저장한 일정이 끊김).
 
 ## 구조
 - `index.html`, `css/`, `js/` : 프론트엔드
