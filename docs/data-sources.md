@@ -8,7 +8,7 @@ README "데이터 출처와 갱신일"을 쓸 때 쓰는 점검표입니다. 아
 |---|---|---|---|
 | 여행지·음식점 검색, 좌표, 쉬는 날·이용시간·주차·예약·문의처 | 한국관광공사 TourAPI (공공데이터포털, KorService2) | /api/search, /api/detail | 이용 허락 조건(공공누리 유형 등 — 응답의 `cpyrhtDivCd` 필드는 이미지 저작권 구분), 출처 표시 방법, 일일 호출 한도 |
 | 출발지·도착지 검색(역·터미널·숙소 등) | 카카오 로컬 API (키워드 검색) | /api/search | 이용 약관, 출처 표시, 호출 한도 |
-| 대중교통 이동시간·노선 | Google Routes API (경로 매트릭스, 경로) | /api/matrix, /api/leg | Google 지도 플랫폼 약관 — OpenStreetMap(Leaflet) 지도와 함께 쓰는 것, 결과 저장·캐시, 출처 표시 규정 / 요금과 무료 사용량 |
+| 대중교통 이동시간·노선 | Google Routes API (경로 매트릭스, 경로) | /api/matrix, /api/leg | Google 지도 플랫폼 약관 — OpenFreeMap(OpenStreetMap 데이터, MapLibre) 지도와 함께 쓰는 것, 결과 저장·캐시, 출처 표시 규정 / 요금과 무료 사용량 |
 | 자동차 이동시간·거리 | 카카오모빌리티 길찾기 API | /api/matrix | 이용 약관, 호출 한도, 출처 표시 |
 | 지도 | MapLibre GL + OpenFreeMap(OpenStreetMap 데이터) | 인증키·가입 없이 사용할 수 있고 상업적 사용도 가능하다고 안내됨(openfreemap.org). 출처 표기 필수 — 지도 모서리(자동)와 화면 하단에 © OpenStreetMap 기여자, OpenFreeMap 표기. 공개 서버라 요청은 병렬 4개 이내, 대량 내려받기는 제한 |
 

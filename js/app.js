@@ -649,7 +649,7 @@ function renderSuggestion(suggestion, plan) {
 // 지도는 처음부터 보이고, 출발지·경유지·도착지를 고를 때마다 핀이 바뀐다.
 // 지도 도구는 MapLibre GL, 배경은 OpenFreeMap(OpenStreetMap 데이터, 인증키 없이 사용 가능)의 "positron" 스타일이다.
 // 기본 OpenStreetMap 지도는 글자와 색이 너무 많아 우리 핀과 경로가 묻혀서 바꿨다.
-const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/' + (['positron', 'liberty', 'bright'].includes(new URLSearchParams(location.search).get('tiles')) ? new URLSearchParams(location.search).get('tiles') : 'positron'); // ?tiles= 는 비교용(임시)
+const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 
 let mapReady = false; // 지도 배경이 다 불러와졌는지
 let markers = []; // 지금 지도에 올려 둔 핀들
