@@ -466,14 +466,23 @@ async function checkClosedDays(plan, stopIds, stopDetails, timetable) {
   );
 }
 
+// 영업시간의 시각 표시. 밤 12시(24:00)에 닫는 곳은 "다음 날 00:00"이 아니라 "24:00"으로 보여 준다.
+const hoursClock = (minutes) => (minutes >= 1440 ? '24:00' : formatTime(minutes));
+
+// 방문일에 해당하는 영업시간 한 줄. 예: "09:00~17:00 (입장마감 16:00)"
+function hoursRangeText(hours) {
+  const last = hours.lastEntry === null ? '' : ' (' + hours.lastLabel + ' ' + hoursClock(hours.lastEntry) + ')';
+  return hoursClock(hours.open) + '~' + hoursClock(hours.close) + last;
+}
+
 // 영업시간이 안 맞는 이유 한 문장(끝에 마침표 없음).
 function hoursMessage(hours, visit) {
   const arrive = formatTime(visit.arrive);
   switch (hours.problem) {
-    case 'before-open': return arrive + ' 도착은 영업 시작(' + formatTime(hours.open) + ') 전입니다';
-    case 'after-close': return arrive + ' 도착은 영업 종료(' + formatTime(hours.close) + ') 뒤입니다';
-    case 'after-last': return arrive + ' 도착은 ' + hours.lastLabel + '(' + formatTime(hours.lastEntry) + ') 뒤입니다';
-    default: return '체류 중인 ' + formatTime(hours.close) + '에 영업이 끝납니다(출발 예정 ' + formatTime(visit.depart) + ')';
+    case 'before-open': return arrive + ' 도착은 영업 시작(' + hoursClock(hours.open) + ') 전입니다';
+    case 'after-close': return arrive + ' 도착은 영업 종료(' + hoursClock(hours.close) + ') 뒤입니다';
+    case 'after-last': return arrive + ' 도착은 ' + hours.lastLabel + '(' + hoursClock(hours.lastEntry) + ') 뒤입니다';
+    default: return '체류 중인 ' + hoursClock(hours.close) + '에 영업이 끝납니다(출발 예정 ' + formatTime(visit.depart) + ')';
   }
 }
 
@@ -516,7 +525,9 @@ function renderClosedAlerts(plan, route, closedById) {
     // 쉬는 날이면 영업시간은 따로 경고하지 않는다(어차피 문을 닫는 날).
     if (info.hours.status === 'bad' && info.status !== 'closed') {
       const card = el('div', { class: 'closed-alert', role: 'group' }, el('strong', {}, '⚠ ' + place.name + ' — ' + hoursMessage(info.hours, info.visit)));
-      card.append(el('p', {}, '등록된 영업시간: ' + info.hours.raw));
+      // 방문일에 해당하는 구간을 먼저 보여 주고, 등록된 원문은 작게 덧붙인다(원문은 달·요일별 구간이 붙어 있어 길다).
+      card.append(el('p', {}, '방문일 기준 영업시간: ' + hoursRangeText(info.hours)));
+      card.append(el('p', { class: 'closed-raw' }, '등록된 원문: ' + info.hours.raw.replace(/(\S)\[/g, '$1 [')));
       card.append(renderContactLine(place, info.detail));
       box.append(card);
     }
@@ -536,8 +547,7 @@ function hoursNote(info) {
   if (hours.status === 'bad') return '⚠ ' + hoursMessage(hours, info.visit) + '.';
   if (hours.status === 'check') return 'ℹ 영업시간을 자동으로 판단하지 못했습니다. 위 내용을 직접 확인해 주세요.';
   if (hours.always) return '등록된 정보로는 상시 개방입니다.';
-  const last = hours.lastEntry === null ? '' : ', ' + hours.lastLabel + ' ' + formatTime(hours.lastEntry);
-  return '등록된 영업시간(' + formatTime(hours.open) + '~' + formatTime(hours.close) + last + ') 안에 도착합니다.';
+  return '등록된 영업시간(' + hoursRangeText(hours).replace(' (', ', ').replace(/\)$/, '') + ') 안에 도착합니다.';
 }
 
 // "가기 전 확인할 것"의 쉬는 날 줄 아래에 붙이는 한 줄.
