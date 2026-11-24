@@ -726,9 +726,10 @@ function renderSuggestion(suggestion, plan) {
 
 // ---------- 지도 ----------
 // 지도는 처음부터 보이고, 출발지·경유지·도착지를 고를 때마다 핀이 바뀐다.
-// 지도 도구는 MapLibre GL, 배경은 OpenFreeMap(OpenStreetMap 데이터, 인증키 없이 사용 가능)의 "positron" 스타일이다.
-// 기본 OpenStreetMap 지도는 글자와 색이 너무 많아 우리 핀과 경로가 묻혀서 바꿨다.
-const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
+// 지도 도구는 MapLibre GL, 배경은 OpenFreeMap(OpenStreetMap 데이터, 인증키 없이 사용 가능)의 "liberty" 스타일이다.
+// 처음에는 회색뿐인 "positron"을 썼는데 색이 없어 한강·공원·도로를 구분하기 어렵다는 의견이 있어 색이 있는 스타일로 바꿨다.
+// 대신 경로선은 강(파랑)·공원(초록)·도로(노랑)와 겹치지 않는 보라색으로 해서 묻히지 않게 한다.
+const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
 
 // 지도 배경(OpenFreeMap)을 못 불러올 때 대신 쓰는 빈 배경. 핀과 경로선은 이 위에도 그려진다.
 const FALLBACK_STYLE = { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#eef0f3' } }] };
@@ -774,7 +775,7 @@ function ensureMap() {
       map.addSource('route', { type: 'geojson', data: routeGeoJson() });
       const round = { 'line-cap': 'round', 'line-join': 'round' };
       map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: round, paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.95 } });
-      map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: round, paint: { 'line-color': '#2f4fd0', 'line-width': 4, 'line-dasharray': [0.1, 2] } });
+      map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: round, paint: { 'line-color': '#6d28d9', 'line-width': 4, 'line-dasharray': [0.1, 2] } });
       styleLoaded = true;
     });
     // 배경 지도 스타일을 못 불러오면(서버 점검·차단·인터넷 문제) 빈 배경으로 바꾸고 안내한다. 일정 검사는 지도 없이도 된다.
