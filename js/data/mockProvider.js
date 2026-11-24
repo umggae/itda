@@ -31,6 +31,21 @@ const DETAILS = {
     reservation: '필요 없음',
     contact: '051-000-0000',
   },
+  // 쉬는 날 경고 확인용: 화요일 휴무(공휴일 예외 문구 포함)와 판단할 수 없는 표기
+  'p-bukchon': {
+    closedDays: '매주 화요일 ※ 단, 정기휴일이 공휴일 및 대체공휴일과 겹칠 경우에는 개방하며, 그 다음의 첫 번째 비공휴일이 정기휴일임',
+    hours: '09:00~18:00',
+    parking: '불가능',
+    reservation: null,
+    contact: '02-000-0002',
+  },
+  'p-gwangjang': {
+    closedDays: '점포 별로 상이함',
+    hours: null,
+    parking: null,
+    reservation: null,
+    contact: null,
+  },
   'r-seolleongtang': {
     closedDays: '매주 월요일',
     hours: '10:00~21:00 (브레이크타임 15:00~17:00)',

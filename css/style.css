@@ -185,6 +185,17 @@ button.primary:hover { background: var(--accent-dark); }
 .leg-meta { color: var(--muted); font-size: 0.92rem; }
 .badge-bad { color: var(--bad-line); font-weight: 700; margin-top: 4px; }
 
+/* 쉬는 날 안내: 경고(쉬는 날일 수 있음)는 노란 바탕, 확인 필요(판단 못함)는 회색 바탕 */
+#closed-alerts { margin: 10px 0; }
+.closed-alert, .closed-check { border: 2px solid; border-radius: 12px; padding: 10px 14px; margin: 8px 0; font-size: 0.95rem; }
+.closed-alert { background: #fff4d6; border-color: #e0b13a; color: #4a3600; }
+.closed-check { background: #f2f4f7; border-color: #c5ccd6; }
+.closed-alert p, .closed-check p { margin: 4px 0 0; overflow-wrap: anywhere; }
+.closed-contact a { font-weight: 700; margin-right: 10px; }
+.closed-disclaimer { margin: 8px 0; }
+.closed-note { margin: 6px 0 2px; font-weight: 700; font-size: 0.92rem; overflow-wrap: anywhere; }
+.badge-closed { display: inline-block; background: #fff4d6; border: 1px solid #e0b13a; color: #4a3600; border-radius: 999px; padding: 1px 8px; font-size: 0.8rem; font-weight: 700; margin-left: 4px; }
+
 .rides { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
 .ride { border-top: 1px solid var(--line); padding-top: 8px; }
 .chip { display: inline-block; padding: 1px 10px; border-radius: 999px; font-weight: 700; font-size: 0.92rem; margin-right: 6px; }

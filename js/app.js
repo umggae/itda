@@ -14,6 +14,8 @@ import { kakaoRouteUrl } from './core/mapLinks.js';
 import { savePlan, overwritePlan, loadPlan, deletePlan, listPlans, MAX_SAVED } from './core/savedPlans.js';
 import { attachAutocomplete } from './ui/autocomplete.js';
 import { REGION } from './core/region.js';
+import { parseClosedDays, checkClosed, dateWithWeekday } from './core/closedDays.js';
+import { findPhone } from './core/phone.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -422,9 +424,10 @@ async function runCheck() {
         ? suggestBetterOrder({ originId: plan.originId, destinationId: plan.destinationId, stopIds, legMinutes })
         : { improved: false };
     const details = await Promise.all(stopIds.map((id) => provider.getPlaceDetail(id)));
+    const closedById = await checkClosedDays(plan, stopIds, details);
 
     state.lastCheck = plan;
-    renderResult({ plan, route, timetable, legInfo, suggestion, details });
+    renderResult({ plan, route, timetable, legInfo, suggestion, details, closedById });
     $('result').hidden = false;
     setStatus(
       timetable.feasible
@@ -439,8 +442,74 @@ async function runCheck() {
   }
 }
 
+// ---------- 쉬는 날 ----------
+// 방문 날짜(plan.date)에 각 장소가 쉬는 날인지 본다. 이동시간 계산과는 별개라 가능/불가능 판정에 영향을 주지 않는다.
+// 경유지는 이미 받은 상세 정보를 쓰고, 출발지·도착지는 한국관광공사 장소일 때만 따로 받는다(실패해도 검사는 계속한다).
+// → Map(장소 id → { status, raw, holidayCaveat, closedDay?, lunarNote?, detail })
+async function checkClosedDays(plan, stopIds, stopDetails) {
+  const detailById = new Map(stopIds.map((id, i) => [id, stopDetails[i]]));
+  const endpointIds = [plan.originId, plan.destinationId].filter((id, i, all) => id.startsWith('tour-') && all.indexOf(id) === i && !detailById.has(id));
+  const endpointDetails = await Promise.all(endpointIds.map((id) => provider.getPlaceDetail(id).catch(() => null)));
+  endpointIds.forEach((id, i) => {
+    if (endpointDetails[i]) detailById.set(id, endpointDetails[i]);
+  });
+  return new Map([...detailById].map(([id, detail]) => [id, { ...checkClosed(parseClosedDays(detail.closedDays), plan.date), detail }]));
+}
+
+// 문의처 한 줄. 전화번호가 있으면 눌러서 걸 수 있는 링크를 붙이고, 없으면 지도·검색 링크로 안내한다.
+function renderContactLine(place, detail) {
+  const text = detail.contact ?? place.phone ?? null; // 카카오 검색 결과의 전화번호도 쓴다
+  const phone = findPhone(text);
+  const line = el('p', { class: 'closed-contact' });
+  if (text) line.append('문의처: ' + text + ' ');
+  else line.append('문의처 정보가 없습니다. 아래 링크에서 찾아 직접 확인해 주세요.');
+  if (phone) line.append(el('a', { href: 'tel:' + phone.tel }, '전화 걸기 (' + phone.display + ')'));
+  else line.append(renderPlaceLinks(place, detail));
+  return line;
+}
+
+// 검사 결과 위쪽의 쉬는 날 안내. 쉬는 날일 수 있는 곳(경고)과 판단하지 못한 곳(확인 필요)만 카드로 보이고,
+// 정보가 하나라도 있으면 "정확하지 않을 수 있으니 직접 확인" 안내를 항상 붙인다.
+function renderClosedAlerts(plan, route, closedById) {
+  const box = $('closed-alerts');
+  box.replaceChildren();
+  const when = dateWithWeekday(plan.date);
+
+  for (const id of route) {
+    const info = closedById.get(id);
+    if (!info || (info.status !== 'closed' && info.status !== 'check')) continue;
+    const place = state.places[id];
+    const card =
+      info.status === 'closed'
+        ? el('div', { class: 'closed-alert', role: 'group' }, el('strong', {}, '⚠ ' + place.name + ' — ' + when + '은 쉬는 날일 수 있습니다'))
+        : el('div', { class: 'closed-check', role: 'group' }, el('strong', {}, 'ℹ ' + place.name + ' — 쉬는 날을 자동으로 판단하지 못했습니다'));
+    card.append(el('p', {}, '등록된 쉬는 날: ' + info.raw));
+    if (info.holidayCaveat) card.append(el('p', {}, '공휴일과 겹치면 쉬는 날이 달라질 수 있습니다.'));
+    card.append(renderContactLine(place, info.detail));
+    box.append(card);
+  }
+
+  if ([...closedById.values()].some((info) => info.status !== 'none')) {
+    box.append(
+      el('p', { class: 'closed-disclaimer hint' }, '쉬는 날은 한국관광공사에 등록된 정보라 정확하지 않을 수 있습니다. 가기 전에 해당 장소에 직접 연락해 확인해 주세요. (' + when + ' 방문 기준)'),
+    );
+  }
+}
+
+// "가기 전 확인할 것"의 쉬는 날 줄 아래에 붙이는 한 줄.
+function closedNote(info, when) {
+  if (!info || info.status === 'none') return null;
+  if (info.status === 'closed') return '⚠ 방문일 ' + when + '은 쉬는 날일 수 있습니다.' + (info.holidayCaveat ? ' 공휴일과 겹치면 달라질 수 있습니다.' : '');
+  if (info.status === 'check') return 'ℹ 쉬는 날을 자동으로 판단하지 못했습니다. 위 내용을 직접 확인해 주세요.';
+  return (
+    '등록된 정보로는 방문일 ' + when + '이 쉬는 날이 아닙니다.' +
+    (info.holidayCaveat ? ' 공휴일에는 달라질 수 있습니다.' : '') +
+    (info.lunarNote ? ' 설·추석 연휴에는 쉴 수 있습니다.' : '')
+  );
+}
+
 // ---------- 결과 그리기 ----------
-function renderResult({ plan, route, timetable, legInfo, suggestion, details }) {
+function renderResult({ plan, route, timetable, legInfo, suggestion, details, closedById }) {
   // 가능 여부
   const verdict = $('verdict');
   verdict.replaceChildren();
@@ -464,9 +533,10 @@ function renderResult({ plan, route, timetable, legInfo, suggestion, details }) 
     );
   }
 
+  renderClosedAlerts(plan, route, closedById);
   renderSuggestion(suggestion, plan);
 
-  renderTimeline(plan, timetable, legInfo);
+  renderTimeline(plan, timetable, legInfo, closedById);
   $('transit-hint').hidden = plan.mode !== 'transit'; // 배차 간격·탑승 시간 설명은 대중교통 결과에만 보인다
 
   // 가기 전 확인할 것
@@ -481,7 +551,7 @@ function renderResult({ plan, route, timetable, legInfo, suggestion, details }) 
     ['문의처', 'contact'],
   ];
   plan.stops.forEach((stop, i) => {
-    checklist.append(renderChecklistItem(state.places[stop.placeId], details[i]));
+    checklist.append(renderChecklistItem(state.places[stop.placeId], details[i], closedNote(closedById.get(stop.placeId), dateWithWeekday(plan.date))));
   });
 
   updateMap();
@@ -489,7 +559,7 @@ function renderResult({ plan, route, timetable, legInfo, suggestion, details }) 
 }
 
 // 일정 타임라인: 장소(점) — 구간 카드 — 장소 … 모양으로 그린다.
-function renderTimeline(plan, timetable, legInfo) {
+function renderTimeline(plan, timetable, legInfo, closedById) {
   const list = $('timeline');
   list.replaceChildren();
   const lastIndex = timetable.rows.length - 1;
@@ -507,9 +577,9 @@ function renderTimeline(plan, timetable, legInfo) {
         : i === lastIndex
           ? formatTime(row.arrive) + ' 도착'
           : formatTime(row.arrive) + ' 도착 · ' + formatTime(row.depart) + ' 출발 (체류 ' + formatDuration(row.depart - row.arrive) + ')';
-    list.append(
-      el('li', { class: 'node' }, dot, el('div', { class: 'node-name' }, nameOf(row.id)), el('div', { class: 'node-times' }, times)),
-    );
+    const name = el('div', { class: 'node-name' }, nameOf(row.id));
+    if (closedById.get(row.id)?.status === 'closed') name.append(' ', el('span', { class: 'badge-closed' }, '⚠ 쉬는 날일 수 있음'));
+    list.append(el('li', { class: 'node' }, dot, name, el('div', { class: 'node-times' }, times)));
 
     if (i < lastIndex) {
       const leg = timetable.legs[i];
@@ -580,7 +650,7 @@ function renderRide(ride) {
 
 // "가기 전 확인할 것" 한 곳. 정보는 한국관광공사(TourAPI)에 등록된 내용이라 비어 있는 항목이 있을 수 있다.
 // 비어 있으면 "정보 없음"과 함께, 직접 확인할 수 있는 지도·검색 링크를 보여 준다.
-function renderChecklistItem(place, detail) {
+function renderChecklistItem(place, detail, closedText = null) {
   const fromTour = place.id.startsWith('tour-');
   const rows = [
     ['쉬는 날', detail.closedDays],
@@ -591,16 +661,26 @@ function renderChecklistItem(place, detail) {
   ];
   const dl = el('dl');
   for (const [label, value] of rows) {
-    dl.append(el('dt', {}, label), el('dd', {}, value ?? '정보 없음'));
+    const dd = el('dd', {}, value ?? '정보 없음');
+    // 문의처에 전화번호가 있으면 눌러서 걸 수 있게 한다(링크에는 숫자만 쓴다).
+    const phone = label === '문의처' ? findPhone(value) : null;
+    if (phone) dd.append(' ', el('a', { href: 'tel:' + phone.tel }, '전화 걸기'));
+    dl.append(el('dt', {}, label), dd);
   }
+  const note = closedText ? el('p', { class: 'closed-note' }, closedText) : null;
 
   const empty = rows.every(([, value]) => value === null);
   const source = fromTour
     ? empty
       ? '한국관광공사에 이 장소의 상세 정보가 등록되어 있지 않습니다.'
-      : '출처: 한국관광공사. 등록되지 않은 항목은 "정보 없음"입니다.'
+      : '출처: 한국관광공사. 등록되지 않은 항목은 "정보 없음"입니다. 쉬는 날·영업시간은 정확하지 않을 수 있으니 문의처로 직접 확인해 주세요.'
     : '카카오 검색으로 찾은 장소(역·터미널·숙소 등)라 쉬는 날·영업시간 정보가 없습니다.';
 
+  return el('details', {}, el('summary', {}, place.name), dl, note, el('p', { class: 'hint' }, source), renderPlaceLinks(place, detail));
+}
+
+// 직접 확인할 수 있는 링크(공식 홈페이지, 카카오맵, 네이버 검색).
+function renderPlaceLinks(place, detail) {
   const open = (href, text) => el('a', { href, target: '_blank', rel: 'noopener noreferrer' }, text);
   const links = el('p', { class: 'check-links' });
   const kakaoUrl = place.id.startsWith('kakao-')
@@ -611,8 +691,7 @@ function renderChecklistItem(place, detail) {
     open('https://search.naver.com/search.naver?query=' + encodeURIComponent(place.name + ' 영업시간'), '네이버에서 영업시간 검색'),
   );
   if (detail.homepage) links.prepend(open(detail.homepage, '공식 홈페이지'));
-
-  return el('details', {}, el('summary', {}, place.name), dl, el('p', { class: 'hint' }, source), links);
+  return links;
 }
 
 function renderSuggestion(suggestion, plan) {
@@ -1052,8 +1131,8 @@ for (const eventName of ['input', 'search']) {
 }
 // 이동수단에 따라 날짜·시각이 어떻게 쓰이는지 한 줄로 알려 준다. (자동차는 날짜를 바꿔도 결과가 같다)
 const MODE_HINTS = {
-  transit: '대중교통은 입력한 날짜·시작 시각의 시간표로 계산합니다. 오늘 기준 약 6일 전부터 99일 뒤까지의 날짜만 조회됩니다.',
-  car: '자동차 이동시간은 날짜·시각과 상관없이 조회하는 시점의 교통 기준입니다.',
+  transit: '대중교통은 입력한 날짜·시작 시각의 시간표로 계산합니다. 오늘 기준 약 6일 전부터 99일 뒤까지의 날짜만 조회됩니다. 날짜는 방문 장소의 쉬는 날 확인에도 쓰입니다.',
+  car: '자동차 이동시간은 날짜·시각과 상관없이 조회하는 시점의 교통 기준입니다. 날짜는 방문 장소의 쉬는 날 확인에만 쓰입니다.',
 };
 function updateModeHint() {
   const mode = document.querySelector('input[name="mode"]:checked')?.value ?? 'transit';
