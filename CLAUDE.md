@@ -35,7 +35,10 @@
 
 - (2026-11-24) 이름 변경 마무리: 새 주소 `wishroute-rho.vercel.app`, 저장소 `umggae/wishroute`(둘 다 사용자가 변경), README·CLAUDE.md 링크 교체, `origin` 변경, 저장 키 `wishroute.savedPlans.v2`(옛 키에서 자동 이전), TourAPI `MobileApp: 'Wishroute'`. 테스트 103개 통과. push·배포 완료, 새 주소·옛 주소 모두에서 TourAPI 검색·상세(쉬는 날)가 정상임을 확인(앱 이름 변경 영향 없음).
 
+- (2026-11-24) 영업시간 경고 구현(설계: `docs/design-opening-hours.md`): `js/core/openingHours.js`. 도착·출발 시각이 등록된 이용시간(입장마감·마지막 주문 포함)과 안 맞으면 경고 카드·일정 옆 "영업시간 확인". 이용시간 37건 중 29건 판단. 쉬는 날 경고 때 생긴 "null" 글자 버그도 수정. 테스트 118개 통과, 가짜 데이터로 화면 확인. 아직 push·배포 전.
+
 ## 다음에 할 일
+- 영업시간 경고를 배포 후 실제 한국관광공사 데이터로 화면에서 확인하고, 검증 표(README, `docs/verification.md`)에 줄과 캡처 추가. 예: 12월 경복궁에 16:30 이후 도착(입장마감 16:00).
 - 맥북에서는 `git remote set-url origin https://github.com/umggae/wishroute.git` 한 번 실행.
 - 실제 사용자 브라우저(창이 보이는 상태)에서 지도 첫 표시가 느린지 직접 확인. 느리다면 그때 로딩 표시나 가벼운 스타일을 검토.
 - 같은 탭에서 공유 링크의 `#` 부분만 바꾸면 일정이 다시 복원되지 않음(새로고침해야 함). 필요하면 `hashchange` 처리.
