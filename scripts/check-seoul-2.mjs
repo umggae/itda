@@ -37,7 +37,7 @@ for (const [a, b] of [['서울역', '강남역'], ['서울역', '경복궁'], ['
 console.log('\n=== B) TourAPI 관광지 검색 진단 ===');
 const url = (op, params) =>
   'https://apis.data.go.kr/B551011/KorService2/' + op + '?' +
-  new URLSearchParams({ serviceKey: KEY, MobileOS: 'ETC', MobileApp: 'Itda', _type: 'json', ...params });
+  new URLSearchParams({ serviceKey: KEY, MobileOS: 'ETC', MobileApp: 'Wishroute', _type: 'json', ...params });
 async function tour(label, op, params) {
   try {
     const res = await fetch(url(op, params));

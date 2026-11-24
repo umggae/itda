@@ -102,7 +102,7 @@ async function callTour(operation, params) {
   // 인증키는 주소에 들어가므로, 이 주소는 오류 메시지·로그에 절대 내보내지 않는다.
   const url =
     BASE + operation + '?' +
-    new URLSearchParams({ serviceKey: key, MobileOS: 'ETC', MobileApp: 'Itda', _type: 'json', ...params });
+    new URLSearchParams({ serviceKey: key, MobileOS: 'ETC', MobileApp: 'Wishroute', _type: 'json', ...params });
   let res;
   try {
     res = await fetch(url, { signal: AbortSignal.timeout(8000) });

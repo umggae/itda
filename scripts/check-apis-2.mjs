@@ -37,7 +37,7 @@ function print(title, { status, body }, maxChars = 1200) {
 
 const tourUrl = (operation, params) =>
   'https://apis.data.go.kr/B551011/KorService2/' + operation + '?' +
-  new URLSearchParams({ serviceKey: KEYS.TOURAPI_KEY, MobileOS: 'ETC', MobileApp: 'Itda', _type: 'json', ...params });
+  new URLSearchParams({ serviceKey: KEYS.TOURAPI_KEY, MobileOS: 'ETC', MobileApp: 'Wishroute', _type: 'json', ...params });
 
 const firstItem = (body) => {
   try {

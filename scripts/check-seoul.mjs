@@ -49,7 +49,7 @@ const google = (url, mask, body) => [
 ];
 const tourUrl = (operation, params) =>
   'https://apis.data.go.kr/B551011/KorService2/' + operation + '?' +
-  new URLSearchParams({ serviceKey: KEYS.TOURAPI_KEY, MobileOS: 'ETC', MobileApp: 'Itda', _type: 'json', ...params });
+  new URLSearchParams({ serviceKey: KEYS.TOURAPI_KEY, MobileOS: 'ETC', MobileApp: 'Wishroute', _type: 'json', ...params });
 
 console.log('출발 시각(한국 시간 내일 10:00):', departure);
 

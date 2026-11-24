@@ -111,7 +111,7 @@ if (need('TOURAPI_KEY')) {
     const params = new URLSearchParams({
       serviceKey: KEYS.TOURAPI_KEY,
       MobileOS: 'ETC',
-      MobileApp: 'Itda',
+      MobileApp: 'Wishroute',
       _type: 'json',
       areaCode: '6', // 부산 (확인용: 응답 주소가 부산인지 본다)
       numOfRows: '2',

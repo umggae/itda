@@ -5,10 +5,11 @@
 // storage는 localStorage처럼 getItem / setItem을 가진 것. 직접 넘겨 받아서 테스트에서는 가짜 저장소를 쓴다.
 import { encodePlan, decodePlan } from './share.js';
 
-// 키 이름의 "itda"는 서비스의 옛 이름(잇다)이다. 이름을 위시루트로 바꿨지만 키를 바꾸면
-// 사용자가 이미 저장한 일정이 보이지 않게 되므로 일부러 그대로 둔다.
-export const STORAGE_KEY = 'itda.savedPlans.v2';
-const OLD_STORAGE_KEY = 'itda.savedPlans.v1'; // 예전 방식(날짜당 1개). 처음 읽을 때 새 방식으로 옮긴다.
+// 서비스 이름이 "잇다"에서 "위시루트"로 바뀌면서 저장 키도 wishroute로 바꿨다.
+// 새 키가 비어 있으면 처음 읽을 때 옛 키(itda…)의 일정을 새 키로 옮겨 온다. 옛 키는 지우지 않는다(되돌릴 수 있게).
+export const STORAGE_KEY = 'wishroute.savedPlans.v2';
+const LEGACY_V2_KEY = 'itda.savedPlans.v2'; // 옛 이름 시절의 같은 형식
+const OLD_STORAGE_KEY = 'itda.savedPlans.v1'; // 그보다 예전 방식(날짜당 1개). 처음 읽을 때 새 방식으로 옮긴다.
 export const MAX_SAVED = 50; // 브라우저 저장 공간을 지키려는 상한
 
 function newId(now) {
@@ -27,6 +28,16 @@ function writeAll(storage, entries) {
   }
 }
 
+// 옛 키(itda.savedPlans.v2)의 일정. 없거나 깨졌으면 빈 목록(그러면 더 예전 방식을 이어서 살펴본다).
+function readLegacyV2(storage) {
+  try {
+    const data = JSON.parse(storage.getItem(LEGACY_V2_KEY) ?? '[]');
+    return Array.isArray(data) ? data.filter(isEntry) : [];
+  } catch {
+    return [];
+  }
+}
+
 // 저장소 읽기. 비어 있거나 깨졌거나 접근이 막혀(시크릿 모드 등) 있으면 빈 목록으로 본다.
 function readAll(storage) {
   try {
@@ -35,7 +46,13 @@ function readAll(storage) {
       const data = JSON.parse(text);
       return Array.isArray(data) ? data.filter(isEntry) : [];
     }
-    // 새 방식 데이터가 아직 없으면 예전 데이터({ 날짜: { encoded, savedAt } })를 옮겨 온다.
+    // 새 키에 데이터가 아직 없으면 옛 이름(itda) 시절의 같은 형식 데이터를 먼저 옮겨 온다.
+    const legacy = readLegacyV2(storage);
+    if (legacy.length > 0) {
+      writeAll(storage, legacy);
+      return legacy;
+    }
+    // 그것도 없으면 더 예전 데이터({ 날짜: { encoded, savedAt } })를 옮겨 온다.
     const old = JSON.parse(storage.getItem(OLD_STORAGE_KEY) ?? '{}');
     if (!old || typeof old !== 'object' || Array.isArray(old)) return [];
     const moved = Object.keys(old)

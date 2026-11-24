@@ -118,6 +118,44 @@ test('예전 방식(날짜당 1개) 저장 내용을 새 방식으로 옮겨 온
   assert.ok(oldStore.raw(), '새 방식으로 저장됨');
 });
 
+test('옛 이름(itda) 시절의 저장 내용을 새 키(wishroute)로 옮겨 오고, 옛 키는 지우지 않는다', () => {
+  const probe = fakeStorage();
+  const saved = savePlan(probe, plan('2026-10-20'), places, at(0));
+  const legacyJson = probe.raw(); // 같은 형식의 JSON
+  const storage = fakeStorage({ 'itda.savedPlans.v2': legacyJson });
+  const list = listPlans(storage);
+  assert.deepEqual(list.map((item) => item.id), [saved.id]);
+  assert.equal(list[0].title, '서울역 → 강남역');
+  assert.equal(storage.raw(), legacyJson, '새 키에 같은 내용이 저장됨');
+  assert.equal(storage.raw('itda.savedPlans.v2'), legacyJson, '옛 키는 그대로 남음');
+  // 이어서 저장하면 새 키에만 쌓인다
+  savePlan(storage, plan('2026-10-21'), places, at(1));
+  assert.equal(JSON.parse(storage.raw()).length, 2);
+  assert.equal(storage.raw('itda.savedPlans.v2'), legacyJson);
+});
+
+test('새 키에 일정이 있으면 옛 키는 보지 않는다', () => {
+  const probe = fakeStorage();
+  savePlan(probe, plan('2026-10-20'), places, at(0));
+  const current = savePlan(probe, plan('2026-10-22'), places, at(5));
+  const storage = fakeStorage({ [STORAGE_KEY]: probe.raw(), 'itda.savedPlans.v2': '[{"id":"old","date":"2026-01-01","encoded":"x"}]' });
+  assert.ok(listPlans(storage).some((item) => item.id === current.id));
+  assert.ok(!listPlans(storage).some((item) => item.id === 'old'));
+});
+
+test('옛 키 내용이 깨져 있어도 오류 없이 빈 목록이고, 더 예전 방식으로 이어서 찾는다', () => {
+  assert.deepEqual(listPlans(fakeStorage({ 'itda.savedPlans.v2': '이건 JSON이 아님' })), []);
+  assert.deepEqual(listPlans(fakeStorage({ 'itda.savedPlans.v2': '{"a":1}' })), []);
+  const probe = fakeStorage();
+  savePlan(probe, plan('2026-10-20'), places, at(0));
+  const entry = JSON.parse(probe.raw())[0];
+  const storage = fakeStorage({
+    'itda.savedPlans.v2': '이건 JSON이 아님',
+    'itda.savedPlans.v1': JSON.stringify({ '2026-10-20': { encoded: entry.encoded, savedAt: entry.savedAt } }),
+  });
+  assert.equal(listPlans(storage).length, 1);
+});
+
 test('깨진 저장 내용은 빈 목록으로 보고, 깨진 항목만 건너뛴다', () => {
   assert.deepEqual(listPlans(fakeStorage({ [STORAGE_KEY]: '이건 JSON이 아님' })), []);
   assert.deepEqual(listPlans(fakeStorage({ [STORAGE_KEY]: '{"a":1}' })), []);
