@@ -26,7 +26,7 @@ const PLACES = [
 const DETAILS = {
   'p-gyeongbok': {
     closedDays: '연중무휴',
-    hours: '09:00~18:00',
+    hours: '09:00~18:00 (입장마감 17:00)',
     parking: '마을 입구 공영주차장(소규모)',
     reservation: '필요 없음',
     contact: '051-000-0000',

@@ -5,7 +5,7 @@
 const DAY_CHARS = '일월화수목금토'; // Date.getUTCDay() 순서(일요일이 0)
 
 // 'YYYY-MM-DD' → { year, month, day, weekday }. 없는 날짜(2026-02-30 등)이면 null.
-function parseYmd(ymd) {
+export function parseYmd(ymd) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd ?? ''));
   if (!match) return null;
   const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];

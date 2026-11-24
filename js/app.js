@@ -16,6 +16,7 @@ import { attachAutocomplete } from './ui/autocomplete.js';
 import { REGION } from './core/region.js';
 import { parseClosedDays, checkClosed, dateWithWeekday } from './core/closedDays.js';
 import { findPhone } from './core/phone.js';
+import { parseHours, checkHours } from './core/openingHours.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -424,7 +425,7 @@ async function runCheck() {
         ? suggestBetterOrder({ originId: plan.originId, destinationId: plan.destinationId, stopIds, legMinutes })
         : { improved: false };
     const details = await Promise.all(stopIds.map((id) => provider.getPlaceDetail(id)));
-    const closedById = await checkClosedDays(plan, stopIds, details);
+    const closedById = await checkClosedDays(plan, stopIds, details, timetable);
 
     state.lastCheck = plan;
     renderResult({ plan, route, timetable, legInfo, suggestion, details, closedById });
@@ -442,18 +443,38 @@ async function runCheck() {
   }
 }
 
-// ---------- 쉬는 날 ----------
-// 방문 날짜(plan.date)에 각 장소가 쉬는 날인지 본다. 이동시간 계산과는 별개라 가능/불가능 판정에 영향을 주지 않는다.
+// ---------- 쉬는 날·영업시간 ----------
+// 방문 날짜(plan.date)에 각 장소가 쉬는 날인지, 도착·출발 시각에 영업 중인지 본다.
+// 이동시간 계산과는 별개라 가능/불가능 판정에 영향을 주지 않는다.
 // 경유지는 이미 받은 상세 정보를 쓰고, 출발지·도착지는 한국관광공사 장소일 때만 따로 받는다(실패해도 검사는 계속한다).
-// → Map(장소 id → { status, raw, holidayCaveat, closedDay?, lunarNote?, detail })
-async function checkClosedDays(plan, stopIds, stopDetails) {
+// 영업시간은 도착 시각이 있는 곳(경유지·도착지)만 본다. 출발지는 일정 시작 시각에 떠나는 곳이라 보지 않는다.
+// → Map(장소 id → { status, raw, holidayCaveat, closedDay?, lunarNote?, detail, hours, visit })
+async function checkClosedDays(plan, stopIds, stopDetails, timetable) {
   const detailById = new Map(stopIds.map((id, i) => [id, stopDetails[i]]));
   const endpointIds = [plan.originId, plan.destinationId].filter((id, i, all) => id.startsWith('tour-') && all.indexOf(id) === i && !detailById.has(id));
   const endpointDetails = await Promise.all(endpointIds.map((id) => provider.getPlaceDetail(id).catch(() => null)));
   endpointIds.forEach((id, i) => {
     if (endpointDetails[i]) detailById.set(id, endpointDetails[i]);
   });
-  return new Map([...detailById].map(([id, detail]) => [id, { ...checkClosed(parseClosedDays(detail.closedDays), plan.date), detail }]));
+  const visitById = new Map(timetable.rows.slice(1).map((row) => [row.id, { arrive: row.arrive, depart: row.depart }]));
+  return new Map(
+    [...detailById].map(([id, detail]) => {
+      const visit = visitById.get(id) ?? null;
+      const hours = visit ? checkHours(parseHours(detail.hours), plan.date, visit) : { status: 'none', raw: null };
+      return [id, { ...checkClosed(parseClosedDays(detail.closedDays), plan.date), detail, hours, visit }];
+    }),
+  );
+}
+
+// 영업시간이 안 맞는 이유 한 문장(끝에 마침표 없음).
+function hoursMessage(hours, visit) {
+  const arrive = formatTime(visit.arrive);
+  switch (hours.problem) {
+    case 'before-open': return arrive + ' 도착은 영업 시작(' + formatTime(hours.open) + ') 전입니다';
+    case 'after-close': return arrive + ' 도착은 영업 종료(' + formatTime(hours.close) + ') 뒤입니다';
+    case 'after-last': return arrive + ' 도착은 ' + hours.lastLabel + '(' + formatTime(hours.lastEntry) + ') 뒤입니다';
+    default: return '체류 중인 ' + formatTime(hours.close) + '에 영업이 끝납니다(출발 예정 ' + formatTime(visit.depart) + ')';
+  }
 }
 
 // 문의처 한 줄. 전화번호가 있으면 눌러서 걸 수 있는 링크를 붙이고, 없으면 지도·검색 링크로 안내한다.
@@ -468,7 +489,8 @@ function renderContactLine(place, detail) {
   return line;
 }
 
-// 검사 결과 위쪽의 쉬는 날 안내. 쉬는 날일 수 있는 곳(경고)과 판단하지 못한 곳(확인 필요)만 카드로 보이고,
+// 검사 결과 위쪽의 쉬는 날·영업시간 안내. 쉬는 날일 수 있는 곳, 영업시간과 안 맞는 곳(경고)과
+// 쉬는 날을 판단하지 못한 곳(확인 필요)만 카드로 보이고(영업시간을 판단하지 못한 곳은 카드 없이 확인 목록에만 표시),
 // 정보가 하나라도 있으면 "정확하지 않을 수 있으니 직접 확인" 안내를 항상 붙인다.
 function renderClosedAlerts(plan, route, closedById) {
   const box = $('closed-alerts');
@@ -477,23 +499,45 @@ function renderClosedAlerts(plan, route, closedById) {
 
   for (const id of route) {
     const info = closedById.get(id);
-    if (!info || (info.status !== 'closed' && info.status !== 'check')) continue;
+    if (!info) continue;
     const place = state.places[id];
-    const card =
-      info.status === 'closed'
-        ? el('div', { class: 'closed-alert', role: 'group' }, el('strong', {}, '⚠ ' + place.name + ' — ' + when + '은 쉬는 날일 수 있습니다'))
-        : el('div', { class: 'closed-check', role: 'group' }, el('strong', {}, 'ℹ ' + place.name + ' — 쉬는 날을 자동으로 판단하지 못했습니다'));
-    card.append(el('p', {}, '등록된 쉬는 날: ' + info.raw));
-    if (info.holidayCaveat) card.append(el('p', {}, '공휴일과 겹치면 쉬는 날이 달라질 수 있습니다.'));
-    card.append(renderContactLine(place, info.detail));
-    box.append(card);
+
+    if (info.status === 'closed' || info.status === 'check') {
+      const card =
+        info.status === 'closed'
+          ? el('div', { class: 'closed-alert', role: 'group' }, el('strong', {}, '⚠ ' + place.name + ' — ' + when + '은 쉬는 날일 수 있습니다'))
+          : el('div', { class: 'closed-check', role: 'group' }, el('strong', {}, 'ℹ ' + place.name + ' — 쉬는 날을 자동으로 판단하지 못했습니다'));
+      card.append(el('p', {}, '등록된 쉬는 날: ' + info.raw));
+      if (info.holidayCaveat) card.append(el('p', {}, '공휴일과 겹치면 쉬는 날이 달라질 수 있습니다.'));
+      card.append(renderContactLine(place, info.detail));
+      box.append(card);
+    }
+
+    // 쉬는 날이면 영업시간은 따로 경고하지 않는다(어차피 문을 닫는 날).
+    if (info.hours.status === 'bad' && info.status !== 'closed') {
+      const card = el('div', { class: 'closed-alert', role: 'group' }, el('strong', {}, '⚠ ' + place.name + ' — ' + hoursMessage(info.hours, info.visit)));
+      card.append(el('p', {}, '등록된 영업시간: ' + info.hours.raw));
+      card.append(renderContactLine(place, info.detail));
+      box.append(card);
+    }
   }
 
-  if ([...closedById.values()].some((info) => info.status !== 'none')) {
+  if ([...closedById.values()].some((info) => info.status !== 'none' || info.hours.status !== 'none')) {
     box.append(
-      el('p', { class: 'closed-disclaimer hint' }, '쉬는 날은 한국관광공사에 등록된 정보라 정확하지 않을 수 있습니다. 가기 전에 해당 장소에 직접 연락해 확인해 주세요. (' + when + ' 방문 기준)'),
+      el('p', { class: 'closed-disclaimer hint' }, '쉬는 날·영업시간은 한국관광공사에 등록된 정보라 정확하지 않을 수 있습니다. 가기 전에 해당 장소에 직접 연락해 확인해 주세요. (' + when + ' 방문 기준)'),
     );
   }
+}
+
+// "가기 전 확인할 것"의 이용·영업시간 줄 아래에 붙이는 한 줄.
+function hoursNote(info) {
+  const hours = info?.hours;
+  if (!hours || hours.status === 'none') return null;
+  if (hours.status === 'bad') return '⚠ ' + hoursMessage(hours, info.visit) + '.';
+  if (hours.status === 'check') return 'ℹ 영업시간을 자동으로 판단하지 못했습니다. 위 내용을 직접 확인해 주세요.';
+  if (hours.always) return '등록된 정보로는 상시 개방입니다.';
+  const last = hours.lastEntry === null ? '' : ', ' + hours.lastLabel + ' ' + formatTime(hours.lastEntry);
+  return '등록된 영업시간(' + formatTime(hours.open) + '~' + formatTime(hours.close) + last + ') 안에 도착합니다.';
 }
 
 // "가기 전 확인할 것"의 쉬는 날 줄 아래에 붙이는 한 줄.
@@ -551,7 +595,9 @@ function renderResult({ plan, route, timetable, legInfo, suggestion, details, cl
     ['문의처', 'contact'],
   ];
   plan.stops.forEach((stop, i) => {
-    checklist.append(renderChecklistItem(state.places[stop.placeId], details[i], closedNote(closedById.get(stop.placeId), dateWithWeekday(plan.date))));
+    const info = closedById.get(stop.placeId);
+    const notes = [closedNote(info, dateWithWeekday(plan.date)), hoursNote(info)].filter(Boolean);
+    checklist.append(renderChecklistItem(state.places[stop.placeId], details[i], notes));
   });
 
   updateMap();
@@ -578,7 +624,9 @@ function renderTimeline(plan, timetable, legInfo, closedById) {
           ? formatTime(row.arrive) + ' 도착'
           : formatTime(row.arrive) + ' 도착 · ' + formatTime(row.depart) + ' 출발 (체류 ' + formatDuration(row.depart - row.arrive) + ')';
     const name = el('div', { class: 'node-name' }, nameOf(row.id));
-    if (closedById.get(row.id)?.status === 'closed') name.append(' ', el('span', { class: 'badge-closed' }, '⚠ 쉬는 날일 수 있음'));
+    const visitInfo = closedById.get(row.id);
+    if (visitInfo?.status === 'closed') name.append(' ', el('span', { class: 'badge-closed' }, '⚠ 쉬는 날일 수 있음'));
+    else if (visitInfo?.hours.status === 'bad') name.append(' ', el('span', { class: 'badge-closed' }, '⚠ 영업시간 확인'));
     list.append(el('li', { class: 'node' }, dot, name, el('div', { class: 'node-times' }, times)));
 
     if (i < lastIndex) {
@@ -650,7 +698,7 @@ function renderRide(ride) {
 
 // "가기 전 확인할 것" 한 곳. 정보는 한국관광공사(TourAPI)에 등록된 내용이라 비어 있는 항목이 있을 수 있다.
 // 비어 있으면 "정보 없음"과 함께, 직접 확인할 수 있는 지도·검색 링크를 보여 준다.
-function renderChecklistItem(place, detail, closedText = null) {
+function renderChecklistItem(place, detail, notes = []) {
   const fromTour = place.id.startsWith('tour-');
   const rows = [
     ['쉬는 날', detail.closedDays],
@@ -667,7 +715,7 @@ function renderChecklistItem(place, detail, closedText = null) {
     if (phone) dd.append(' ', el('a', { href: 'tel:' + phone.tel }, '전화 걸기'));
     dl.append(el('dt', {}, label), dd);
   }
-  const note = closedText ? el('p', { class: 'closed-note' }, closedText) : null;
+  const noteLines = notes.map((text) => el('p', { class: 'closed-note' }, text)); // 없으면 아무것도 붙이지 않는다(null을 붙이면 "null" 글자가 보인다)
 
   const empty = rows.every(([, value]) => value === null);
   const source = fromTour
@@ -676,7 +724,7 @@ function renderChecklistItem(place, detail, closedText = null) {
       : '출처: 한국관광공사. 등록되지 않은 항목은 "정보 없음"입니다. 쉬는 날·영업시간은 정확하지 않을 수 있으니 문의처로 직접 확인해 주세요.'
     : '카카오 검색으로 찾은 장소(역·터미널·숙소 등)라 쉬는 날·영업시간 정보가 없습니다.';
 
-  return el('details', {}, el('summary', {}, place.name), dl, note, el('p', { class: 'hint' }, source), renderPlaceLinks(place, detail));
+  return el('details', {}, el('summary', {}, place.name), dl, ...noteLines, el('p', { class: 'hint' }, source), renderPlaceLinks(place, detail));
 }
 
 // 직접 확인할 수 있는 링크(공식 홈페이지, 카카오맵, 네이버 검색).
