@@ -10,7 +10,7 @@ README "데이터 출처와 갱신일"을 쓸 때 쓰는 점검표입니다. 아
 | 출발지·도착지 검색(역·터미널·숙소 등) | 카카오 로컬 API (키워드 검색) | /api/search | 이용 약관, 출처 표시, 호출 한도 |
 | 대중교통 이동시간·노선 | Google Routes API (경로 매트릭스, 경로) | /api/matrix, /api/leg | Google 지도 플랫폼 약관 — OpenStreetMap(Leaflet) 지도와 함께 쓰는 것, 결과 저장·캐시, 출처 표시 규정 / 요금과 무료 사용량 |
 | 자동차 이동시간·거리 | 카카오모빌리티 길찾기 API | /api/matrix | 이용 약관, 호출 한도, 출처 표시 |
-| 지도 | Leaflet + OpenStreetMap | (브라우저) | © OpenStreetMap 기여자 표기(화면 하단에 이미 있음), 타일 서버 이용 정책 |
+| 지도 | MapLibre GL + OpenFreeMap(OpenStreetMap 데이터) | 인증키·가입 없이 사용할 수 있고 상업적 사용도 가능하다고 안내됨(openfreemap.org). 출처 표기 필수 — 지도 모서리(자동)와 화면 하단에 © OpenStreetMap 기여자, OpenFreeMap 표기. 공개 서버라 요청은 병렬 4개 이내, 대량 내려받기는 제한 |
 
 ## 알려진 한계에 적을 만한 것 (사실 확인된 것)
 - 자동차 경로는 Google Routes API가 한국에서 경로를 반환하지 않아(2026-10-15 실제 호출로 확인) 카카오모빌리티를 씁니다.
