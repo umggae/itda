@@ -16,9 +16,9 @@
 
 ## 공개 주소
 
-서비스: [https://itda-rho.vercel.app/](https://itda-rho.vercel.app/)
+서비스: [https://wishroute-rho.vercel.app/](https://wishroute-rho.vercel.app/)
 
-저장소: [https://github.com/umggae/itda](https://github.com/umggae/itda)
+저장소: [https://github.com/umggae/wishroute](https://github.com/umggae/wishroute)
 
 지도 데이터를 실시간으로 조회하는 서버 함수가 필요해서, 교수님께 서버 사용을 허락받고 GitHub Pages 대신 Vercel에 배포했습니다.
 

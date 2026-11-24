@@ -137,3 +137,9 @@
 - 바꾼 것: `index.html`의 title·h1, `README.md` 제목과 소개 문장, `css/style.css` 머리 주석, `CLAUDE.md`. 이전 기록(이 로그의 옛 항목)은 당시 이름 그대로 둠.
 - 일부러 안 바꾼 것(바꾸면 기존 링크·데이터가 끊김): 배포 주소 `itda-rho.vercel.app`, GitHub 저장소 이름 `itda`, 브라우저 저장 키 `itda.savedPlans.v2`(바꾸면 사용자가 저장한 일정이 사라져 보임), TourAPI에 보내는 앱 이름 `MobileApp: 'Itda'`(사용자에게 안 보이고, 운영 서버 코드라 배포 후 확인이 필요해 보류).
 - 남은 일: 주소·저장소 이름까지 바꾸려면 Vercel 프로젝트(도메인)와 GitHub 저장소 설정을 사용자가 직접 바꿔야 하고, README·CLAUDE.md의 주소도 같이 고쳐야 함.
+## 이름 변경 마무리: 주소·저장소·저장 키·API 앱 이름 (2026-11-24)
+- 사용자가 직접 한 일: Vercel 주소를 `wishroute-rho.vercel.app`으로, GitHub 저장소 이름을 `wishroute`로 변경. 확인: 새 주소·옛 주소 모두 200이고 새 이름("위시루트")으로 나옴, 저장소 `umggae/wishroute`가 공개로 존재.
+- 내가 한 일: ① README·CLAUDE.md의 주소와 저장소 링크 교체. ② 이 PC의 `origin`을 `https://github.com/umggae/wishroute.git`으로 변경(접근 확인). ③ 브라우저 저장 키를 `itda.savedPlans.v2` → `wishroute.savedPlans.v2`로 바꾸고, 새 키가 비어 있으면 옛 키(`itda.savedPlans.v2`, 그다음 `v1`)에서 옮겨 오도록 함. 옛 키는 지우지 않음. ④ TourAPI에 보내는 `MobileApp`을 `Itda` → `Wishroute`로 변경(서버와 확인용 스크립트).
+- 테스트: 저장 키 이전 테스트 3개 추가(옛 키에서 옮기기, 새 키가 있으면 옛 키 무시, 옛 키가 깨져도 안전). 총 103개 통과. 실제 브라우저(가짜 데이터 모드)에서 옛 키에 일정을 넣고 새로고침하면 "저장한 일정 1"로 나오고 새 키에 저장되며 옛 키는 남는 것을 확인.
+- 알아둘 점: 브라우저 저장은 주소(origin)별이라 새 주소에서는 옛 주소에 저장한 일정이 보이지 않음(공유 링크로 옮겨야 함). 옛 주소는 이미 공유한 링크 때문에 유지. 같은 코드가 옛 주소에도 배포되므로 옛 주소에서는 저장 키 이전으로 일정이 그대로 보임.
+- 확인하지 못한 것: 배포 후 `MobileApp` 변경이 TourAPI 검색에 영향이 없는지(배포 사이트에서 경복궁 검색으로 확인 필요). 이 PC의 로컬 폴더 이름(`itda`)은 그대로.

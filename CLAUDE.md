@@ -1,9 +1,11 @@
 # 위시루트 (wishroute)
 
 서울에서 대중교통·자동차로 여러 경유지를 도는 하루 일정의 구간별 이동시간과 방문 순서를 검사하고 더 효율적인 순서를 제안하는 서비스. 자세한 내용은 `README.md` 참고.
-- 서비스: https://itda-rho.vercel.app/ (Vercel 배포)
-- 저장소: https://github.com/umggae/itda (로컬 폴더 이름은 wishroute)
-- 이름: 옛 이름은 "잇다". 이미 같은 이름의 유명한 사이트가 있어 2026-11-24에 "위시루트"로 바꿈. 화면·문서의 이름만 바꿨고 **주소(itda-rho.vercel.app), 저장소 이름(itda), 브라우저 저장 키(`itda.savedPlans.v2`), TourAPI 앱 이름(`MobileApp: 'Itda'`)은 그대로** 둠(바꾸면 기존 링크·저장한 일정이 끊김).
+- 서비스: https://wishroute-rho.vercel.app/ (Vercel 배포)
+- 저장소: https://github.com/umggae/wishroute
+- 이름: 옛 이름은 "잇다". 이미 같은 이름의 유명한 사이트가 있어 2026-11-24에 "위시루트"로 바꿈. 화면·문서·저장소 이름·배포 주소·브라우저 저장 키(`wishroute.savedPlans.v2`)·TourAPI 앱 이름(`Wishroute`)을 모두 바꿨다.
+  - 옛 주소 https://itda-rho.vercel.app/ 도 아직 열린다(이미 공유한 링크 때문에 유지). 브라우저 저장은 주소별로 따로라서 **새 주소에서는 옛 주소에 저장한 일정이 보이지 않는다**(공유 링크로 옮기기).
+  - 저장 키는 새 키가 비어 있으면 옛 키(`itda.savedPlans.v2`, `v1`)에서 옮겨 온다. 옛 키는 지우지 않는다.
 
 ## 구조
 - `index.html`, `css/`, `js/` : 프론트엔드
@@ -31,7 +33,10 @@
 - (2026-11-24) 쉬는 날 경고 구현(설계: `docs/design-closed-days.md`): `js/core/closedDays.js`, `js/core/phone.js`, `js/app.js`. 한국관광공사 "쉬는 날" 글자 중 연중무휴·매주 X요일·1월 1일만 판단하고 나머지는 "확인 필요"+원문. 모든 경우에 직접 연락 확인 안내와 문의처(전화 링크) 표시. 판정과 별개, 자동차에서도 날짜 사용. 테스트 100개 통과, `?mock=1`로 화면 확인. push·배포 완료, 배포 사이트에서 실제 데이터로 확인(화요일 경복궁 경고·서울숲 확인 필요·전화 링크, 목요일 경고 해제).
 - (2026-11-24) 지도가 회색뿐이라 보기 힘들다는 의견으로 스타일을 `positron` → `liberty`(색 있음), 경로선을 보라색으로 변경(`js/app.js`). push·배포 완료. 처음에 "타일이 10~20초 걸린다"고 적었지만 측정 오류였음: 내장 브라우저 창이 숨겨져 있으면 화면 갱신이 멈춰 지도가 첫 프레임을 늦게 그림. 첫 프레임 이후에는 타일이 0.25초 만에 뜸(`docs/ai-log.md` 참고).
 
+- (2026-11-24) 이름 변경 마무리: 새 주소 `wishroute-rho.vercel.app`, 저장소 `umggae/wishroute`(둘 다 사용자가 변경), README·CLAUDE.md 링크 교체, `origin` 변경, 저장 키 `wishroute.savedPlans.v2`(옛 키에서 자동 이전), TourAPI `MobileApp: 'Wishroute'`. 테스트 103개 통과. 커밋·push·배포 전.
+
 ## 다음에 할 일
+- 배포 후 검색이 정상인지 확인(TourAPI 앱 이름을 바꿨음). 맥북에서는 `git remote set-url origin https://github.com/umggae/wishroute.git` 한 번 실행.
 - 실제 사용자 브라우저(창이 보이는 상태)에서 지도 첫 표시가 느린지 직접 확인. 느리다면 그때 로딩 표시나 가벼운 스타일을 검토.
 - 같은 탭에서 공유 링크의 `#` 부분만 바꾸면 일정이 다시 복원되지 않음(새로고침해야 함). 필요하면 `hashchange` 처리.
 - 쉬는 날 2단계 후보: 공휴일·대체공휴일 계산, 설·추석, "매월 둘째 월요일" 같은 규칙.
