@@ -49,16 +49,21 @@ export async function matrix(params) {
       };
     });
   }
+  // 대중교통은 구글 Routes API 결과라서 서버 메모리에 캐시하지 않는다(구글 약관의 캐시 제한). 호출마다 새로 받는다.
   const when = parseWhen(params.get('date'), params.get('time'));
-  return cached('matrix:transit:' + when + ':' + pointKey, 30 * 60, () => transitMatrix(points, when));
+  return transitMatrix(points, when);
 }
 
 // /api/leg?from=lat,lng&to=lat,lng&date=...&time=... → { rides: [탑승 교통수단들] } (노선·탑승 시간·배차 간격). 화면에 나오는 구간만 부른다.
+// 구글 Routes API 결과라서 캐시하지 않는다.
 export async function leg(params) {
   const [from, to] = parsePoints(params.get('from') + ';' + params.get('to'));
   const when = parseWhen(params.get('date'), params.get('time'));
-  const key = 'leg:' + when + ':' + from.lat + ',' + from.lng + '>' + to.lat + ',' + to.lng;
-  return cached(key, 30 * 60, async () => ({ rides: await transitRides(from, to, when) }));
+  return { rides: await transitRides(from, to, when) };
 }
+
+// CDN(Vercel)에 캐시할 초. 구글 결과(대중교통 이동시간·탑승 정보)는 0(캐시 안 함), 카카오모빌리티(자동차)는 30분.
+export const matrixCacheSeconds = (params) => (params.get('mode') === 'car' ? 30 * 60 : 0);
+export const legCacheSeconds = 0;
 
 export { ApiError };

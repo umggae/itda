@@ -15,6 +15,8 @@ export function sendJson(res, status, body, cacheSeconds = 0) {
 }
 
 // work(params) → 응답 객체. params는 주소의 ?뒤 값들(URLSearchParams).
+// cacheSeconds: CDN에 캐시할 초(0이면 캐시하지 않음). 함수를 주면 요청마다 params를 보고 정한다.
+// (구글 Routes API 결과는 약관상 캐시하면 안 되는데, 같은 주소가 자동차(카카오) 결과도 돌려주기 때문)
 export function makeHandler(work, cacheSeconds) {
   return async function handler(req, res) {
     if (req.method !== 'GET') {
@@ -23,7 +25,8 @@ export function makeHandler(work, cacheSeconds) {
     }
     try {
       const params = new URL(req.url, 'http://localhost').searchParams;
-      sendJson(res, 200, await work(params), cacheSeconds);
+      const body = await work(params);
+      sendJson(res, 200, body, typeof cacheSeconds === 'function' ? cacheSeconds(params) : cacheSeconds);
     } catch (error) {
       if (error instanceof ApiError) {
         sendJson(res, error.status, { error: { code: error.code, message: error.message } });
