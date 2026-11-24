@@ -651,7 +651,11 @@ function renderSuggestion(suggestion, plan) {
 // 기본 OpenStreetMap 지도는 글자와 색이 너무 많아 우리 핀과 경로가 묻혀서 바꿨다.
 const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 
-let mapReady = false; // 지도 배경이 다 불러와졌는지
+// 지도 배경(OpenFreeMap)을 못 불러올 때 대신 쓰는 빈 배경. 핀과 경로선은 이 위에도 그려진다.
+const FALLBACK_STYLE = { version: 8, sources: {}, layers: [{ id: 'background', type: 'background', paint: { 'background-color': '#eef0f3' } }] };
+
+let styleLoaded = false; // 지금 지도 스타일이 다 불러와졌는지
+let styleFailed = false; // 배경 지도 스타일을 못 불러와 빈 배경으로 바꿨는지
 let markers = []; // 지금 지도에 올려 둔 핀들
 let routeCoords = []; // 마지막으로 그린 경로 [[경도, 위도], ...] (MapLibre는 경도가 먼저)
 
@@ -678,7 +682,8 @@ function ensureMap() {
       attributionControl: { compact: true },
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
-    map.on('load', () => {
+    // 스타일은 처음 한 번, 그리고 빈 배경으로 바꿀 때 또 불러와지므로 'style.load'마다 경로선을 (다시) 얹는다.
+    map.on('style.load', () => {
       // 배경 지도의 이름 표기는 기본이 "영어 + 현지어"라서 한국어 이름만 보이게 바꾼다.
       for (const layer of map.getStyle().layers) {
         const field = layer.layout?.['text-field'];
@@ -691,10 +696,30 @@ function ensureMap() {
       const round = { 'line-cap': 'round', 'line-join': 'round' };
       map.addLayer({ id: 'route-casing', type: 'line', source: 'route', layout: round, paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.95 } });
       map.addLayer({ id: 'route-line', type: 'line', source: 'route', layout: round, paint: { 'line-color': '#2f4fd0', 'line-width': 4, 'line-dasharray': [0.1, 2] } });
-      mapReady = true;
+      styleLoaded = true;
+    });
+    // 배경 지도 스타일을 못 불러오면(서버 점검·차단·인터넷 문제) 빈 배경으로 바꾸고 안내한다. 일정 검사는 지도 없이도 된다.
+    map.on('error', () => {
+      if (styleLoaded || styleFailed) return; // 타일 몇 장이 늦는 정도는 무시
+      styleFailed = true;
+      showMapNotice('배경 지도를 불러오지 못해 빈 배경으로 보여 드립니다. 핀과 선은 그대로 표시되고, 일정 검사도 지도 없이 쓸 수 있습니다. 새로고침하면 다시 시도합니다.');
+      map.setStyle(FALLBACK_STYLE);
     });
   }
   return true;
+}
+
+// 지도 아래에 안내 한 줄을 띄운다. (textContent로만 넣는다)
+function showMapNotice(text) {
+  let notice = $('map-error');
+  if (!notice) {
+    notice = document.createElement('p');
+    notice.id = 'map-error';
+    notice.className = 'map-error';
+    notice.setAttribute('role', 'status');
+    $('map').insertAdjacentElement('afterend', notice);
+  }
+  notice.textContent = text;
 }
 
 function routeGeoJson() {
@@ -751,8 +776,8 @@ function updateMap() {
     markers.push(marker);
   });
 
-  if (mapReady) map.getSource('route').setData(routeGeoJson());
-  else map.once('load', () => map.getSource('route').setData(routeGeoJson()));
+  // 스타일이 아직이면 'style.load'에서 지금 좌표로 선을 만든다.
+  if (styleLoaded && map.getSource('route')) map.getSource('route').setData(routeGeoJson());
   fitMap();
   watchMapSize();
 }

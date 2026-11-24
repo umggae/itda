@@ -51,6 +51,7 @@ a { color: var(--accent-dark); }
 .map-pane { order: -1; background: #dfe5ea; }          /* 모바일: 지도가 위 */
 #map { height: 240px; }
 .map-note { margin: 0; padding: 4px 12px; font-size: 0.8rem; color: var(--muted); background: #fff; }
+.map-error { margin: 0; padding: 6px 12px; font-size: 0.85rem; color: #6b4e00; background: #fff4d6; border-top: 1px solid #f0d78a; }
 
 .panel { background: var(--panel); padding: 0 16px 24px; min-width: 0; }
 
