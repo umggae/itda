@@ -29,7 +29,6 @@
 - Vercel 배포 사이트(https://itda-rho.vercel.app/)에서 새 지도가 정상인지 확인.
 - 키가 필요한 검색·길찾기는 새 지도에서 실제 키로 확인하지 못함(`.env.local` 필요).
 - 지도 서버(`tiles.openfreemap.org`)가 막혔을 때의 동작 확인(미확인).
-- 원격 `design` 브랜치는 병합 끝났으니 지워도 됨.
 - 확장 목표(`docs/ai-log.md`): 쉬는 날 경고, 식사 시간대, 지하철 배차 간격 공공데이터, 여러 날 일정.
 - 11-18 Google Routes 403(결제 수단 문제 추정)이 복구됐는지 확인.
 - 새 컴퓨터에서는 `.env.local` 만들기, Node와 Git 설치 필요.
