@@ -10,7 +10,7 @@ import {
   suggestBetterOrder,
 } from './core/schedule.js';
 import { encodePlan, decodePlan } from './core/share.js';
-import { kakaoRouteUrl } from './core/mapLinks.js';
+import { kakaoRouteUrl, naverAndroidRouteUrl, isAndroid } from './core/mapLinks.js';
 import { savePlan, overwritePlan, loadPlan, renamePlan, deletePlan, listPlans, MAX_SAVED } from './core/savedPlans.js';
 import { attachAutocomplete } from './ui/autocomplete.js';
 import { REGION } from './core/region.js';
@@ -682,9 +682,15 @@ function renderLegCard(plan, leg, info, isProblem) {
   }
 
   if (isProblem) card.append(el('div', { class: 'badge-bad' }, '⚠ 이 구간에서 종료 시각을 넘깁니다'));
-  card.append(
+  const links = el(
+    'div',
+    { class: 'leg-links' },
     el('a', { href: kakaoRouteUrl(plan.mode, from, to), target: '_blank', rel: 'noopener noreferrer' }, '카카오맵에서 길찾기 (새 창)'),
   );
+  if (isAndroid(navigator.userAgent)) {
+    links.append(el('a', { href: naverAndroidRouteUrl(plan.mode, from, to, location.origin) }, '네이버 지도 앱으로 길찾기'));
+  }
+  card.append(links);
   return card;
 }
 

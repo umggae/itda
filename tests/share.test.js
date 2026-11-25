@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { encodePlan, decodePlan } from '../js/core/share.js';
-import { kakaoRouteUrl } from '../js/core/mapLinks.js';
+import { kakaoRouteUrl, naverAndroidRouteUrl, isAndroid } from '../js/core/mapLinks.js';
 import { mockProvider } from '../js/data/mockProvider.js';
 
 const plan = () => ({
@@ -93,4 +93,21 @@ test('mockProvider.getMeta / getMatrix', async () => {
   const table = await mockProvider.getMatrix({ places: [...places, ...more], mode: 'car' });
   assert.equal(table.size, 2); // 2곳 → 순서 있는 쌍 2개
   assert.ok(table.get('hub-seoul-station>hub-gangnam').minutes > 0);
+});
+
+test('네이버 지도 링크(안드로이드): 공식 intent 형식, 대중교통은 public, 자동차는 car, appname 필수', () => {
+  const from = { name: '서울역', lat: 37.5547, lng: 126.9707 };
+  const to = { name: 'A&B#;C', lat: 37.4979, lng: 127.0276 };
+  const url = naverAndroidRouteUrl('transit', from, to, 'https://example.test');
+  assert.ok(url.startsWith('intent://route/public?slat=37.5547&slng=126.9707&sname=' + encodeURIComponent('서울역')));
+  assert.ok(url.includes('&dname=A%26B%23%3BC&appname=https%3A%2F%2Fexample.test#Intent;scheme=nmap;'));
+  assert.ok(url.endsWith('package=com.nhn.android.nmap;end'));
+  assert.ok(naverAndroidRouteUrl('car', from, to, 'x').startsWith('intent://route/car?'));
+});
+
+test('isAndroid: 안드로이드에서만 true', () => {
+  assert.equal(isAndroid('Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36'), true);
+  assert.equal(isAndroid('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'), false);
+  assert.equal(isAndroid('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'), false);
+  assert.equal(isAndroid(undefined), false);
 });
