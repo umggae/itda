@@ -1044,6 +1044,26 @@ function showSaveProblem(result) {
   );
 }
 
+// 새 일정으로 저장한 뒤에는 다음 일정을 바로 만들 수 있게 입력과 결과를 처음 상태로 되돌린다.
+function resetPlanner() {
+  Object.values(completers).forEach((completer) => completer.close());
+  $('plan-form').reset(); // 이동수단·시각·검색어·저장 이름은 HTML의 기본값으로
+  $('date').value = todayText();
+  updateModeHint();
+  for (const role of ['origin', 'destination']) $(role).replaceChildren(el('option', { value: '' }, '먼저 검색해 주세요'));
+  $('search-results').replaceChildren();
+  showStopNote('');
+  showErrors([]);
+  hideAppError();
+  state.stops = [];
+  state.lastCheck = null;
+  setEditing(null); // 빈 화면에서 방금 저장한 일정을 덮어쓰지 않게
+  $('result').hidden = true;
+  // 공유 링크로 열었다면 주소의 일정(#…)을 지운다. 남겨 두면 새로고침할 때 다시 채워진다.
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  renderStops(); // 경유지 목록과 지도도 비운다
+}
+
 // 지금 입력한 일정을 "새 일정"으로 저장한다. 같은 날짜가 있어도 덮어쓰지 않는다.
 function saveCurrentPlan() {
   const plan = planToSave();
@@ -1054,14 +1074,16 @@ function saveCurrentPlan() {
     showSaveProblem(result);
     return;
   }
-  setEditing(result.id);
+  resetPlanner();
   renderSaved();
+  // 맨 위의 안내와 "저장한 일정" 버튼이 보이도록 옮긴다.
+  $('menu-btn').focus();
   setStatus(
     result.renamed
-      ? '똑같은 일정이 이미 있어 이름만 바꿨습니다.'
+      ? '똑같은 일정이 이미 있어 이름만 바꿨습니다. 새 일정을 입력할 수 있게 화면을 비웠습니다.'
       : result.duplicate
-      ? '똑같은 일정이 이미 저장되어 있습니다.'
-      : dateLabel(plan.date) + ' 일정을 새로 저장했습니다. 위쪽 "저장한 일정" 메뉴에서 볼 수 있습니다.',
+      ? '똑같은 일정이 이미 저장되어 있습니다. 새 일정을 입력할 수 있게 화면을 비웠습니다.'
+      : dateLabel(plan.date) + ' 일정을 새로 저장하고 화면을 비웠습니다. 위쪽 "저장한 일정" 메뉴에서 볼 수 있습니다.',
   );
 }
 
