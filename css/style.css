@@ -261,6 +261,7 @@ button.secondary:hover { background: var(--accent-soft); }
 .saved-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: #fff; }
 .saved-actions { display: flex; gap: 6px; }
 .saved-info { min-width: 0; overflow-wrap: anywhere; }
+.saved-name { font-weight: 700; }
 .badge-edit { color: var(--accent-dark); font-size: 0.85rem; font-weight: 700; }
 .save-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .save-row button { flex: 1 1 140px; }

@@ -11,6 +11,18 @@ export const STORAGE_KEY = 'wishroute.savedPlans.v2';
 const LEGACY_V2_KEY = 'itda.savedPlans.v2'; // 옛 이름 시절의 같은 형식
 const OLD_STORAGE_KEY = 'itda.savedPlans.v1'; // 그보다 예전 방식(날짜당 1개). 처음 읽을 때 새 방식으로 옮긴다.
 export const MAX_SAVED = 50; // 브라우저 저장 공간을 지키려는 상한
+export const MAX_NAME_LENGTH = 30;
+
+// 사용자가 붙이는 일정 이름(선택). 이 브라우저에만 저장하고 공유 링크(encoded)에는 넣지 않는다.
+function cleanName(name) {
+  return String(name ?? '').trim().slice(0, MAX_NAME_LENGTH);
+}
+
+function setName(entry, name) {
+  const value = cleanName(name);
+  if (value) entry.name = value;
+  else delete entry.name;
+}
 
 function newId(now) {
   return now.getTime().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -67,28 +79,46 @@ function readAll(storage) {
 
 // 새 일정으로 저장한다. 같은 날짜에 이미 있어도 덮어쓰지 않고 하나 더 만든다.
 // 내용이 똑같은 일정이 이미 있으면 새로 만들지 않는다(duplicate).
-// → { ok, id, duplicate, full }
-export function savePlan(storage, plan, places, now = new Date()) {
+// 그때 새 이름을 적었으면 있던 일정의 이름만 바꾼다(renamed).
+// → { ok, id, duplicate, full, renamed? }
+export function savePlan(storage, plan, places, now = new Date(), name = '') {
   const entries = readAll(storage);
   const encoded = encodePlan(plan, places);
   const same = entries.find((entry) => entry.encoded === encoded);
-  if (same) return { ok: true, id: same.id, duplicate: true, full: false };
+  if (same) {
+    const renamed = cleanName(name) !== '' && cleanName(name) !== same.name;
+    if (renamed) setName(same, name);
+    return { ok: renamed ? writeAll(storage, entries) : true, id: same.id, duplicate: true, full: false, renamed };
+  }
   if (entries.length >= MAX_SAVED) return { ok: false, id: null, duplicate: false, full: true };
 
   const id = newId(now);
-  entries.push({ id, date: plan.date, encoded, savedAt: now.toISOString(), createdAt: now.toISOString() });
+  const entry = { id, date: plan.date, encoded, savedAt: now.toISOString(), createdAt: now.toISOString() };
+  setName(entry, name);
+  entries.push(entry);
   return { ok: writeAll(storage, entries), id, duplicate: false, full: false };
 }
 
 // 저장해 둔 일정(id)의 내용을 지금 일정으로 바꾼다(날짜도 바뀔 수 있음). → { ok, found }
-export function overwritePlan(storage, id, plan, places, now = new Date()) {
+// name을 넘기지 않으면 이름은 그대로, 빈 글자를 넘기면 이름을 지운다.
+export function overwritePlan(storage, id, plan, places, now = new Date(), name = undefined) {
   const entries = readAll(storage);
   const entry = entries.find((item) => item.id === id);
   if (!entry) return { ok: false, found: false };
   entry.date = plan.date;
   entry.encoded = encodePlan(plan, places);
   entry.savedAt = now.toISOString();
+  if (name !== undefined) setName(entry, name);
   return { ok: writeAll(storage, entries), found: true };
+}
+
+// 이름만 바꾼다. 빈 글자면 이름을 지운다. → 저장했으면 true
+export function renamePlan(storage, id, name) {
+  const entries = readAll(storage);
+  const entry = entries.find((item) => item.id === id);
+  if (!entry) return false;
+  setName(entry, name);
+  return writeAll(storage, entries);
 }
 
 // 저장한 일정을 불러온다. 없거나 깨졌으면 null.
@@ -105,7 +135,7 @@ export function deletePlan(storage, id) {
 }
 
 // 목록: 날짜 순(같은 날짜는 처음 만든 순 — 덮어써도 자리가 바뀌지 않는다). 깨진 항목은 건너뛴다.
-// → [{ id, date, title, stopNames, stopCount, savedAt }]
+// → [{ id, date, name, title, stopNames, stopCount, savedAt }]
 export function listPlans(storage) {
   return readAll(storage)
     .slice()
@@ -117,6 +147,7 @@ export function listPlans(storage) {
       return {
         id: entry.id,
         date: entry.date,
+        name: typeof entry.name === 'string' ? cleanName(entry.name) : '',
         title: nameOf(plan.originId) + ' → ' + nameOf(plan.destinationId),
         stopNames: plan.stops.map((stop) => nameOf(stop.placeId)),
         stopCount: plan.stops.length,

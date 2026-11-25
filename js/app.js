@@ -11,7 +11,7 @@ import {
 } from './core/schedule.js';
 import { encodePlan, decodePlan } from './core/share.js';
 import { kakaoRouteUrl } from './core/mapLinks.js';
-import { savePlan, overwritePlan, loadPlan, deletePlan, listPlans, MAX_SAVED } from './core/savedPlans.js';
+import { savePlan, overwritePlan, loadPlan, renamePlan, deletePlan, listPlans, MAX_SAVED } from './core/savedPlans.js';
 import { attachAutocomplete } from './ui/autocomplete.js';
 import { REGION } from './core/region.js';
 import { parseClosedDays, checkClosed, dateWithWeekday } from './core/closedDays.js';
@@ -980,10 +980,12 @@ function renderSaved() {
   if (state.editingId !== null && !saved.some((item) => item.id === state.editingId)) setEditing(null); // 지워진 일정
 
   for (const item of saved) {
-    const name = dateLabel(item.date) + ' ' + item.title;
+    const name = dateLabel(item.date) + ' ' + (item.name || item.title);
     const load = el('button', { type: 'button', 'aria-label': name + ' 일정 불러오기' }, '불러오기');
     const remove = el('button', { type: 'button', 'aria-label': name + ' 일정 삭제' }, '삭제');
+    const rename = el('button', { type: 'button', 'aria-label': name + ' 일정 이름 변경' }, '이름 변경');
     load.addEventListener('click', () => loadSaved(item.id));
+    rename.addEventListener('click', () => renameSaved(item));
     remove.addEventListener('click', () => {
       if (!window.confirm(name + ' 일정을 삭제할까요? 되돌릴 수 없습니다.')) return;
       deletePlan(store, item.id);
@@ -1001,13 +1003,24 @@ function renderSaved() {
           { class: 'saved-info' },
           el('strong', {}, dateLabel(item.date)),
           editing,
+          item.name ? el('div', { class: 'saved-name' }, item.name) : '',
           el('div', {}, item.title),
           el('div', { class: 'tag' }, stopSummary(item.stopNames)),
         ),
-        el('div', { class: 'saved-actions' }, load, remove),
+        el('div', { class: 'saved-actions' }, load, rename, remove),
       ),
     );
   }
+}
+
+function renameSaved(item) {
+  const next = window.prompt('일정 이름을 입력해 주세요. (30자까지, 비우면 이름을 지웁니다)', item.name);
+  if (next === null) return; // 취소
+  const ok = renamePlan(storage(), item.id, next);
+  if (ok && item.id === state.editingId) $('plan-name').value = next.trim().slice(0, 30); // 덮어쓸 때 옛 이름으로 되돌아가지 않게
+  renderSaved();
+  $('saved-status').textContent = ok ? '일정 이름을 바꿨습니다.' : '이름을 저장하지 못했습니다.';
+  $('saved-close').focus();
 }
 
 // 입력 검사를 통과한 현재 일정을 돌려준다. 오류가 있으면 안내하고 null.
@@ -1036,7 +1049,7 @@ function saveCurrentPlan() {
   const plan = planToSave();
   if (!plan) return;
   const store = storage();
-  const result = store ? savePlan(store, plan, state.places) : { ok: false };
+  const result = store ? savePlan(store, plan, state.places, new Date(), $('plan-name').value) : { ok: false };
   if (!result.ok) {
     showSaveProblem(result);
     return;
@@ -1044,7 +1057,9 @@ function saveCurrentPlan() {
   setEditing(result.id);
   renderSaved();
   setStatus(
-    result.duplicate
+    result.renamed
+      ? '똑같은 일정이 이미 있어 이름만 바꿨습니다.'
+      : result.duplicate
       ? '똑같은 일정이 이미 저장되어 있습니다.'
       : dateLabel(plan.date) + ' 일정을 새로 저장했습니다. 위쪽 "저장한 일정" 메뉴에서 볼 수 있습니다.',
   );
@@ -1055,7 +1070,7 @@ function updateSavedPlan() {
   const plan = planToSave();
   if (!plan || state.editingId === null) return;
   const store = storage();
-  const result = store ? overwritePlan(store, state.editingId, plan, state.places) : { ok: false };
+  const result = store ? overwritePlan(store, state.editingId, plan, state.places, new Date(), $('plan-name').value) : { ok: false };
   if (!result.ok) {
     if (result.found === false) {
       setEditing(null);
@@ -1091,6 +1106,7 @@ function loadSaved(id) {
   closeSaved();
   remember(plan.places);
   fillForm(plan);
+  $('plan-name').value = listPlans(storage()).find((item) => item.id === id)?.name ?? '';
   setEditing(id);
   $('result').hidden = true;
   showErrors([]);
@@ -1200,6 +1216,12 @@ function updateModeHint() {
 document.querySelectorAll('input[name="mode"]').forEach((radio) => radio.addEventListener('change', updateModeHint));
 updateModeHint();
 $('save-btn').addEventListener('click', saveCurrentPlan);
+// 이름 칸에서 Enter를 누르면 일정 검사(폼 제출)가 아니라 저장한다. 한글 조합 중의 Enter는 무시한다.
+$('plan-name').addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  if (!event.isComposing) saveCurrentPlan();
+});
 $('update-btn').addEventListener('click', updateSavedPlan);
 $('menu-btn').addEventListener('click', openSaved);
 $('saved-close').addEventListener('click', closeSaved);

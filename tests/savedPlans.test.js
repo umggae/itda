@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { savePlan, overwritePlan, loadPlan, deletePlan, listPlans, STORAGE_KEY, MAX_SAVED } from '../js/core/savedPlans.js';
+import { savePlan, overwritePlan, loadPlan, renamePlan, deletePlan, listPlans, STORAGE_KEY, MAX_SAVED } from '../js/core/savedPlans.js';
 
 // localStorage 흉내: 메모리에만 저장한다.
 function fakeStorage(initial = {}) {
@@ -177,4 +177,50 @@ test('저장소가 막혀 있어도(시크릿 모드 등) 오류 없이 ok: fals
   assert.equal(savePlan(blocked, plan('2026-10-20'), places).ok, false);
   assert.deepEqual(listPlans(blocked), []);
   assert.equal(loadPlan(blocked, 'x'), null);
+});
+
+test('이름은 선택: 붙여서 저장하고, 앞뒤 공백을 없애며 30자까지만 남긴다', () => {
+  const storage = fakeStorage();
+  savePlan(storage, plan('2026-10-20'), places, at(0), '  고궁 나들이  ');
+  savePlan(storage, plan('2026-10-21'), places, at(1));
+  savePlan(storage, plan('2026-10-22'), places, at(2), '가'.repeat(31));
+  assert.deepEqual(listPlans(storage).map((item) => item.name), ['고궁 나들이', '', '가'.repeat(30)]);
+});
+
+test('renamePlan: 이름을 바꾸거나 지운다. 없는 일정이면 false', () => {
+  const storage = fakeStorage();
+  const { id } = savePlan(storage, plan('2026-10-20'), places, at(0), '처음');
+  assert.equal(renamePlan(storage, id, '바꿈'), true);
+  assert.equal(listPlans(storage)[0].name, '바꿈');
+  assert.equal(renamePlan(storage, id, '   '), true);
+  assert.equal(listPlans(storage)[0].name, '');
+  assert.equal(renamePlan(storage, 'nope', 'x'), false);
+});
+
+test('같은 내용을 다른 이름으로 저장하면 이름만 바뀌고, 이름 없이 저장하면 기존 이름이 남는다', () => {
+  const storage = fakeStorage();
+  savePlan(storage, plan('2026-10-20'), places, at(0), '처음');
+  const renamed = savePlan(storage, plan('2026-10-20'), places, at(1), '새 이름');
+  assert.equal(renamed.duplicate, true);
+  assert.equal(renamed.renamed, true);
+  const again = savePlan(storage, plan('2026-10-20'), places, at(2));
+  assert.equal(again.renamed, false);
+  assert.deepEqual(listPlans(storage).map((item) => item.name), ['새 이름']);
+});
+
+test('overwritePlan: 이름을 넘기지 않으면 유지, 넘기면 교체', () => {
+  const storage = fakeStorage();
+  const { id } = savePlan(storage, plan('2026-10-20'), places, at(0), '처음');
+  overwritePlan(storage, id, plan('2026-10-21'), places, at(1));
+  assert.equal(listPlans(storage)[0].name, '처음');
+  overwritePlan(storage, id, plan('2026-10-22'), places, at(2), '둘째');
+  assert.equal(listPlans(storage)[0].name, '둘째');
+});
+
+test('이름은 공유 링크 형식(encoded)에 담기지 않는다', () => {
+  const storage = fakeStorage();
+  savePlan(storage, plan('2026-10-20'), places, at(0), '비밀이름');
+  const [entry] = JSON.parse(storage.raw());
+  assert.ok(!decodeURIComponent(entry.encoded).includes('비밀이름'));
+  assert.equal('name' in loadPlan(storage, entry.id), false);
 });
