@@ -121,6 +121,9 @@ button.primary:hover { background: var(--accent-dark); }
 
 .when { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
 .when .field:first-child { grid-column: 1 / -1; }
+.when .field[hidden] { display: none; } /* .field의 display: flex가 hidden을 덮지 않게 */
+.check-row { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+.check-row input { width: 20px; height: 20px; margin: 0; flex: none; accent-color: var(--accent); }
 
 /* ---------- 경로 카드: 출발 → 경유 → 도착 ---------- */
 .route-card { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 12px 4px; background: #fafbfc; }
@@ -164,6 +167,7 @@ button.primary:hover { background: var(--accent-dark); }
 .verdict { border: 2px solid; border-radius: 12px; padding: 12px 14px; font-weight: 700; font-size: 1.05rem; }
 .verdict.ok { background: var(--ok-bg); border-color: var(--ok-line); }
 .verdict.bad { background: var(--bad-bg); border-color: var(--bad-line); }
+.verdict.info { background: #f2f5f8; border-color: #8793a3; } /* 도착 마감이 없어 판정하지 않는 결과 */
 .verdict small { display: block; font-weight: 400; font-size: 0.92rem; margin-top: 2px; }
 
 .suggestion { background: var(--warn-bg); border: 2px solid var(--warn-line); border-radius: 12px; padding: 12px 14px; margin: 12px 0; }

@@ -48,8 +48,12 @@
             <label for="start">시작 시각</label>
             <input id="start" type="time" value="09:00">
           </div>
-          <div class="field">
-            <label for="end">종료 시각</label>
+          <label class="check-row">
+            <input id="use-end" type="checkbox">
+            <span>도착 마감 시각 설정 (선택)</span>
+          </label>
+          <div class="field" id="end-field" hidden>
+            <label for="end">도착 마감 시각</label>
             <input id="end" type="time" value="21:00">
           </div>
         </div>

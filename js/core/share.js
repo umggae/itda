@@ -20,7 +20,7 @@ export function encodePlan(plan, places) {
   params.set('o', plan.originId);
   params.set('e', plan.destinationId);
   params.set('s', plan.startTime);
-  params.set('t', plan.endTime);
+  if (plan.endTime !== null) params.set('t', plan.endTime); // 도착 마감 시각이 없으면 t를 넣지 않는다
   params.set('p', plan.stops.map((stop) => stop.placeId + ':' + stop.stayMin).join(','));
   const ids = [...new Set([plan.originId, plan.destinationId, ...plan.stops.map((stop) => stop.placeId)])];
   // 장소 하나 = "id~위도~경도~이름". 이름 속 쉼표·물결표는 구분자와 겹치니 공백으로 바꾼다.
@@ -40,14 +40,14 @@ export function decodePlan(hash) {
   const originId = params.get('o');
   const destinationId = params.get('e');
   const startTime = params.get('s');
-  const endTime = params.get('t');
+  const endTime = params.get('t'); // 없으면 null = 도착 마감 시각 없음
   const stopsText = params.get('p');
   const placesText = params.get('l');
 
   if (mode !== 'transit' && mode !== 'car') return null;
   if (!DATE_PATTERN.test(date ?? '')) return null;
   if (!ID_PATTERN.test(originId ?? '') || !ID_PATTERN.test(destinationId ?? '')) return null;
-  if (parseTime(startTime) === null || parseTime(endTime) === null) return null;
+  if (parseTime(startTime) === null || (endTime !== null && parseTime(endTime) === null)) return null;
   if (stopsText === null || placesText === null) return null;
 
   const stops = [];

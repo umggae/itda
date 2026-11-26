@@ -72,7 +72,7 @@ function readPlan() {
     originId: $('origin').value,
     destinationId: $('destination').value,
     startTime: $('start').value,
-    endTime: $('end').value,
+    endTime: $('use-end').checked ? $('end').value : null, // null = 도착 마감 없음
     stops: state.stops.map((stop) => ({ placeId: stop.placeId, stayMin: parseStay(stop.stayText) })),
   };
 }
@@ -83,9 +83,18 @@ function fillForm(plan) {
   setPlaceOption('origin', state.places[plan.originId]);
   setPlaceOption('destination', state.places[plan.destinationId]);
   $('start').value = plan.startTime;
-  $('end').value = plan.endTime;
+  $('use-end').checked = plan.endTime !== null;
+  $('end').value = plan.endTime ?? $('end').defaultValue;
+  syncDeadlineField();
   state.stops = plan.stops.map((stop) => ({ placeId: stop.placeId, stayText: String(stop.stayMin) }));
   renderStops();
+}
+
+// "도착 마감 시각 설정"을 켰을 때만 시각 입력칸을 보여 준다.
+function syncDeadlineField() {
+  const used = $('use-end').checked;
+  $('end-field').hidden = !used;
+  if (!used) $('end').removeAttribute('aria-invalid');
 }
 
 // ---------- 오류 표시 ----------
@@ -433,9 +442,11 @@ async function runCheck() {
     renderResult({ plan, route, timetable, legInfo, suggestion, details, closedById });
     $('result').hidden = false;
     setStatus(
-      timetable.feasible
-        ? '검사 완료: 일정이 가능합니다.'
-        : '검사 완료: 일정이 불가능합니다. ' + formatDuration(timetable.overMinutes) + ' 초과입니다.',
+      timetable.feasible === null
+        ? '검사 완료: ' + formatTime(timetable.finishAt) + '에 도착할 예정입니다.'
+        : timetable.feasible
+          ? '검사 완료: 일정이 가능합니다.'
+          : '검사 완료: 일정이 불가능합니다. ' + formatDuration(timetable.overMinutes) + ' 초과입니다.',
     );
     $('result-title').scrollIntoView({ block: 'start' });
   } catch (error) {
@@ -569,17 +580,23 @@ function renderResult({ plan, route, timetable, legInfo, suggestion, details, cl
   // 가능 여부
   const verdict = $('verdict');
   verdict.replaceChildren();
-  if (timetable.feasible) {
+  if (timetable.feasible === null) {
+    verdict.className = 'verdict info';
+    verdict.append(
+      '도착 예정 — ' + formatTime(timetable.finishAt) + '에 도착지에 도착합니다.',
+      el('small', {}, '총 이동 ' + formatDuration(timetable.totalTravel)),
+    );
+  } else if (timetable.feasible) {
     verdict.className = 'verdict ok';
     verdict.append(
       '가능합니다 — ' + formatTime(timetable.finishAt) + '에 도착지에 도착합니다.',
-      el('small', {}, '종료 시각 ' + plan.endTime + ' 이전 · 총 이동 ' + formatDuration(timetable.totalTravel)),
+      el('small', {}, '도착 마감 ' + plan.endTime + ' 이전 · 총 이동 ' + formatDuration(timetable.totalTravel)),
     );
   } else {
     const problem = timetable.legs[timetable.problemLegIndex];
     verdict.className = 'verdict bad';
     verdict.append(
-      '불가능합니다 — 종료 시각 ' + plan.endTime + '을(를) ' + formatDuration(timetable.overMinutes) + ' 넘깁니다.',
+      '불가능합니다 — 도착 마감 ' + plan.endTime + '을(를) ' + formatDuration(timetable.overMinutes) + ' 넘깁니다.',
       el(
         'small',
         {},
@@ -623,7 +640,7 @@ function renderRegionWarning(plan, route) {
   box.hidden = !needsTransitWarning(plan.mode, route.map((id) => state.places[id]));
   box.textContent = box.hidden
     ? ''
-    : '⚠ ' + REGION.transitCheck.name + ' 밖의 대중교통 시간은 실제와 크게 다를 수 있습니다. 이 시간으로 계산한 가능 여부와 순서 제안도 틀릴 수 있으니, 출발 전에 다른 지도 앱에서도 확인해 주세요.';
+    : '⚠ ' + REGION.transitCheck.name + ' 밖의 대중교통 시간은 실제와 크게 다를 수 있습니다. 이 시간으로 계산한 ' + (plan.endTime === null ? '도착 시각' : '가능 여부') + '과 순서 제안도 틀릴 수 있으니, 출발 전에 다른 지도 앱에서도 확인해 주세요.';
 }
 
 // 일정 타임라인: 장소(점) — 구간 카드 — 장소 … 모양으로 그린다.
@@ -693,7 +710,7 @@ function renderLegCard(plan, leg, info, isProblem) {
     card.append(el('div', { class: 'leg-extra' }, info.summary)); // 노선 정보를 못 받았을 때의 기본 문구
   }
 
-  if (isProblem) card.append(el('div', { class: 'badge-bad' }, '⚠ 이 구간에서 종료 시각을 넘깁니다'));
+  if (isProblem) card.append(el('div', { class: 'badge-bad' }, '⚠ 이 구간에서 도착 마감 시각을 넘깁니다'));
   const links = el(
     'div',
     { class: 'leg-links' },
@@ -1066,6 +1083,7 @@ function showSaveProblem(result) {
 function resetPlanner() {
   Object.values(completers).forEach((completer) => completer.close());
   $('plan-form').reset(); // 이동수단·시각·검색어·저장 이름은 HTML의 기본값으로
+  syncDeadlineField();
   $('date').value = todayText();
   updateModeHint();
   for (const role of ['origin', 'destination']) $(role).replaceChildren(el('option', { value: '' }, '먼저 검색해 주세요'));
@@ -1236,6 +1254,8 @@ $('search-btn').addEventListener('click', () => {
   doSearch();
 });
 for (const role of ['origin', 'destination']) $(role).addEventListener('change', updateMap);
+$('use-end').addEventListener('change', syncDeadlineField);
+syncDeadlineField(); // 뒤로 가기 등으로 브라우저가 체크 상태를 되살린 경우에도 입력칸을 맞춘다
 // 검색칸을 고치거나 지우면(× 버튼 포함) 이전 검색 결과 목록은 치운다. 입력 중에는 자동완성 추천만 보이고,
 // 결과 목록은 "검색"을 눌렀을 때만 나타난다.
 for (const eventName of ['input', 'search']) {

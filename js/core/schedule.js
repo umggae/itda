@@ -14,6 +14,7 @@ export function defaultStayMinutes(category) {
 
 // 입력 검사. 문제가 없으면 빈 배열, 있으면 [{ field, message }].
 // plan = { mode, originId, destinationId, startTime, endTime, stops: [{ placeId, stayMin }] }
+// endTime(도착 마감 시각)은 선택이다. null이면 마감 없음. 빈 글자는 "설정하겠다고 하고 안 적은 것"이라 오류다.
 export function validatePlan(plan) {
   const errors = [];
   const add = (field, message) => errors.push({ field, message });
@@ -29,11 +30,12 @@ export function validatePlan(plan) {
   }
 
   const start = parseTime(plan.startTime);
-  const end = parseTime(plan.endTime);
+  const hasDeadline = plan.endTime !== null;
+  const end = hasDeadline ? parseTime(plan.endTime) : null;
   if (start === null) add('startTime', '시작 시각을 "09:00"처럼 입력해 주세요.');
-  if (end === null) add('endTime', '종료 시각을 "21:00"처럼 입력해 주세요.');
+  if (hasDeadline && end === null) add('endTime', '도착 마감 시각을 "21:00"처럼 입력하거나, "도착 마감 시각 설정"을 꺼 주세요.');
   if (start !== null && end !== null && start >= end) {
-    add('endTime', '시작 시각이 종료 시각보다 늦거나 같습니다. 종료 시각을 시작보다 뒤로 바꿔 주세요.');
+    add('endTime', '시작 시각이 도착 마감 시각보다 늦거나 같습니다. 마감 시각을 시작보다 뒤로 바꿔 주세요.');
   }
 
   const stops = plan.stops ?? [];
@@ -66,9 +68,10 @@ export function validatePlan(plan) {
 // route: 장소 id 순서 [출발지, 장소1, 장소2, ..., 도착지]
 // stays: 장소별 체류시간(분). { 장소id: 분 }  (출발지·도착지는 체류 없음)
 // legMinutes: 함수 (fromId, toId) => 이동 분. 정보가 없으면 null
+// endTime이 null이면 도착 마감이 없으므로 가능/불가능을 판정하지 않는다(feasible: null).
 export function buildTimetable({ route, stays, startTime, endTime, legMinutes }) {
   const start = parseTime(startTime);
-  const end = parseTime(endTime);
+  const end = endTime === null ? null : parseTime(endTime);
   const rows = [{ id: route[0], arrive: null, depart: start }];
   const legs = [];
   let clock = start;
@@ -84,7 +87,7 @@ export function buildTimetable({ route, stays, startTime, endTime, legMinutes })
     const departAt = clock;
     const arriveAt = departAt + minutes;
     legs.push({ from, to, minutes, departAt, arriveAt });
-    if (problemLegIndex === null && arriveAt > end) problemLegIndex = i;
+    if (end !== null && problemLegIndex === null && arriveAt > end) problemLegIndex = i;
 
     const isLast = i === route.length - 2;
     if (isLast) {
@@ -97,12 +100,12 @@ export function buildTimetable({ route, stays, startTime, endTime, legMinutes })
     }
   }
 
-  const overMinutes = Math.max(0, clock - end);
+  const overMinutes = end === null ? 0 : Math.max(0, clock - end);
   return {
     rows,
     legs,
     finishAt: clock,
-    feasible: overMinutes === 0,
+    feasible: end === null ? null : overMinutes === 0,
     overMinutes,
     problemLegIndex,
     totalTravel: legs.reduce((sum, leg) => sum + leg.minutes, 0),
