@@ -17,6 +17,9 @@ const VEHICLE_NAME = {
   FERRY: '배',
 };
 
+// 일반·고속열차는 시간표에 맞춰 타는 교통수단이라 배차 간격을 어림하지 않는다. (KTX는 HEAVY_RAIL로 온다. 지하철은 SUBWAY)
+const NO_ESTIMATE_TYPES = new Set(['HEAVY_RAIL', 'HIGH_SPEED_TRAIN', 'LONG_DISTANCE_TRAIN']);
+
 // ---------- 응답 해석 (순수 함수) ----------
 
 function latLng(stop) {
@@ -95,6 +98,7 @@ function parseRoute(bodyText) {
         headwayEstimated: false,
         color: /^#[0-9a-fA-F]{6}$/.test(line.color ?? '') ? line.color : null,
         textColor: /^#[0-9a-fA-F]{6}$/.test(line.textColor ?? '') ? line.textColor : null,
+        noEstimate: NO_ESTIMATE_TYPES.has(line.vehicle?.type),
       };
     });
 
@@ -112,8 +116,11 @@ function parseRoute(bodyText) {
   return { rides, walkBeforeSec };
 }
 
+// 배차 간격 어림에만 쓴 값은 응답에 싣지 않는다.
+const publicRide = ({ noEstimate, ...ride }) => ride;
+
 export function parseTransitRides(bodyText) {
-  return parseRoute(bodyText)?.rides ?? null;
+  return parseRoute(bodyText)?.rides.map(publicRide) ?? null;
 }
 
 // 배차 간격 어림: 첫 열차(first)를 막 놓치는 시각에 한 번 더 조회해, 같은 노선의 다음 차와의 시각 차이를 구한다.
@@ -198,7 +205,7 @@ export async function transitRides(from, to, when) {
 
   const targets = route.rides
     .map((ride, index) => ({ ride, index }))
-    .filter(({ ride, index }) => ride.headwayMinutes === null && ride.boardAt && (index > 0 || route.walkBeforeSec !== null))
+    .filter(({ ride, index }) => ride.headwayMinutes === null && !ride.noEstimate && ride.boardAt && (index > 0 || route.walkBeforeSec !== null))
     .slice(0, MAX_ESTIMATES);
 
   await Promise.all(
@@ -214,5 +221,5 @@ export async function transitRides(from, to, when) {
       }
     }),
   );
-  return route.rides.map(({ boardAt, fromLoc, toLoc, ...ride }) => ride); // 어림에만 쓴 값은 응답에 싣지 않는다
+  return route.rides.map(({ boardAt, fromLoc, toLoc, ...ride }) => publicRide(ride)); // 어림에만 쓴 값은 응답에 싣지 않는다
 }

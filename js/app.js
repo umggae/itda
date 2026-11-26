@@ -13,7 +13,7 @@ import { encodePlan, decodePlan } from './core/share.js';
 import { kakaoRouteUrl, naverAndroidRouteUrl, isAndroid } from './core/mapLinks.js';
 import { savePlan, overwritePlan, loadPlan, renamePlan, deletePlan, listPlans, MAX_SAVED } from './core/savedPlans.js';
 import { attachAutocomplete } from './ui/autocomplete.js';
-import { REGION } from './core/region.js';
+import { REGION, needsTransitWarning } from './core/region.js';
 import { parseClosedDays, checkClosed, dateWithWeekday } from './core/closedDays.js';
 import { findPhone } from './core/phone.js';
 import { parseHours, checkHours } from './core/openingHours.js';
@@ -411,9 +411,11 @@ async function runCheck() {
     });
     if (timetable.error) {
       showAppError(
-        nameOf(timetable.from) + '에서 ' + nameOf(timetable.to) + '까지 가는 경로를 찾지 못했습니다. ' +
-          '섬이거나 ' + (plan.mode === 'transit' ? '대중교통이 닿지 않는' : '자동차 길이 없는') + ' 곳일 수 있습니다. ' +
-          '해당 장소를 빼거나 다른 장소, 다른 이동수단으로 바꿔 보세요.',
+        nameOf(timetable.from) + '에서 ' + nameOf(timetable.to) + '까지의 경로를 받지 못했습니다. ' +
+          (plan.mode === 'transit'
+            ? '대중교통이 닿지 않거나 길찾기 서비스에 경로 정보가 없는 구간일 수 있습니다. '
+            : '길이 이어지지 않거나, 출발·도착 지점 주변 도로의 교통 장애 때문에 길찾기 서비스가 안내하지 못하는 구간일 수 있습니다. ') +
+          '해당 장소를 빼거나 가까운 다른 장소, 다른 이동수단으로 바꿔 보세요.',
       );
       setStatus('경로를 찾지 못해 검사하지 못했습니다.');
       return;
@@ -587,6 +589,7 @@ function renderResult({ plan, route, timetable, legInfo, suggestion, details, cl
     );
   }
 
+  renderRegionWarning(plan, route);
   renderClosedAlerts(plan, route, closedById);
   renderSuggestion(suggestion, plan);
 
@@ -612,6 +615,15 @@ function renderResult({ plan, route, timetable, legInfo, suggestion, details, cl
 
   updateMap();
   $('share-box').hidden = true;
+}
+
+// 서울 밖이 섞인 대중교통 일정은 시간(과 그 시간으로 계산한 판정·순서 제안)이 크게 틀릴 수 있다고 알린다.
+function renderRegionWarning(plan, route) {
+  const box = $('region-warning');
+  box.hidden = !needsTransitWarning(plan.mode, route.map((id) => state.places[id]));
+  box.textContent = box.hidden
+    ? ''
+    : '⚠ ' + REGION.transitCheck.name + ' 밖의 대중교통 시간은 실제와 크게 다를 수 있습니다. 이 시간으로 계산한 가능 여부와 순서 제안도 틀릴 수 있으니, 출발 전에 다른 지도 앱에서도 확인해 주세요.';
 }
 
 // 일정 타임라인: 장소(점) — 구간 카드 — 장소 … 모양으로 그린다.
@@ -821,8 +833,8 @@ function ensureMap() {
     map = new maplibregl.Map({
       container: 'map',
       style: MAP_STYLE_URL,
-      center: [REGION.center[1], REGION.center[0]], // 서비스 지역 중심
-      zoom: REGION.zoom,
+      bounds: REGION.view, // 지도 크기에 맞춰 국내 전체가 보이게
+      fitBoundsOptions: { padding: 10 },
       attributionControl: { compact: true },
     });
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
@@ -883,7 +895,7 @@ function fitMap() {
   } else if (routeCoords.length === 1) {
     map.jumpTo({ center: routeCoords[0], zoom: 14 });
   } else {
-    map.jumpTo({ center: [REGION.center[1], REGION.center[0]], zoom: REGION.zoom });
+    map.fitBounds(REGION.view, { padding: 10, duration: 0 });
   }
 }
 

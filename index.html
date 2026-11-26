@@ -22,7 +22,7 @@
             <span aria-hidden="true">☰</span> 저장한 일정 <span id="saved-count" class="badge">0</span>
           </button>
         </div>
-        <p>경유지가 여러 곳인 하루 일정을 대중교통으로도 검사해 보세요.</p>
+        <p>전국에서 경유지가 여러 곳인 하루 일정을 대중교통으로도 검사해 보세요.</p>
       </header>
 
       <!-- 상태 메시지: 스크린 리더가 읽어 주는 영역 -->
@@ -61,7 +61,7 @@
             <div class="stop-body">
               <label for="origin-query">출발지 검색</label>
               <div class="search-row">
-                <input id="origin-query" type="search" maxlength="30" placeholder="예: 서울역, 홍대 호텔" autocomplete="off" class="grow">
+                <input id="origin-query" type="search" maxlength="30" placeholder="예: 서울역, 부산역" autocomplete="off" class="grow">
                 <button type="button" id="origin-search">검색</button>
               </div>
               <label for="origin" class="sr-only">출발지 선택</label>
@@ -90,7 +90,7 @@
             <div class="stop-body">
               <label for="destination-query">도착지 검색</label>
               <div class="search-row">
-                <input id="destination-query" type="search" maxlength="30" placeholder="예: 서울역, 강남역" autocomplete="off" class="grow">
+                <input id="destination-query" type="search" maxlength="30" placeholder="예: 서울역, 전주역" autocomplete="off" class="grow">
                 <button type="button" id="destination-search">검색</button>
               </div>
               <label for="destination" class="sr-only">도착지 선택</label>
@@ -117,6 +117,7 @@
       <section id="result" aria-labelledby="result-title" hidden>
         <h2 id="result-title">검사 결과</h2>
         <div id="verdict" class="verdict"></div>
+        <p id="region-warning" class="closed-alert" hidden></p>
         <div id="closed-alerts" aria-live="polite"></div>
         <div id="suggestion"></div>
 

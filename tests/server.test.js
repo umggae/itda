@@ -9,7 +9,7 @@ import { cacheGet, cacheSet, cached } from '../server/lib/cache.js';
 import { parseTourItems, toPlace, parseDetail, parseCommon } from '../server/clients/tourApi.js';
 import { parseKakaoPlaces, kakaoCategory } from '../server/clients/kakaoLocal.js';
 import { parseCarRoute } from '../server/clients/kakaoMobility.js';
-import { parseTransitMatrix, parseTransitRides, nextDepartureGapMinutes } from '../server/clients/googleRoutes.js';
+import { parseTransitMatrix, parseTransitRides, transitRides, nextDepartureGapMinutes } from '../server/clients/googleRoutes.js';
 
 const throwsCode = (fn, code) => assert.throws(fn, (e) => e instanceof ApiError && e.code === code);
 
@@ -31,13 +31,15 @@ test('parsePlaceId: TourAPI·카카오 형식만 허용', () => {
     throwsCode(() => parsePlaceId(bad), 'BAD_REQUEST');
   }
 });
-test('parsePoints: 서비스 지역(서울) 안 좌표 2~8개', () => {
+test('parsePoints: 서비스 지역(대한민국) 안 좌표 2~8개', () => {
   const points = parsePoints('37.5547,126.9707;37.4979,127.0276');
   assert.equal(points.length, 2);
   assert.deepEqual(points[0], { lat: 37.5547, lng: 126.9707 });
   throwsCode(() => parsePoints('37.5547,126.9707'), 'BAD_REQUEST'); // 1개
   throwsCode(() => parsePoints(Array(9).fill('37.5,127.0').join(';')), 'BAD_REQUEST'); // 9개
-  throwsCode(() => parsePoints('37.5,127.0;35.1,129.0'), 'BAD_REQUEST'); // 부산 좌표는 지역 밖
+  assert.equal(parsePoints('37.5,127.0;35.1,129.0').length, 2); // 부산도 받는다
+  assert.equal(parsePoints('33.4587,126.9425;33.5066,126.4929').length, 2); // 제주
+  throwsCode(() => parsePoints('37.5,127.0;35.68,139.69'), 'BAD_REQUEST'); // 도쿄 좌표는 지역 밖
   throwsCode(() => parsePoints('abc,127;37.5,127.0'), 'BAD_REQUEST');
   throwsCode(() => parsePoints('37.5;37.5,127.0'), 'BAD_REQUEST');
 });
@@ -88,7 +90,8 @@ test('toPlace: 경도(mapx)·위도(mapy), 관광지/음식점 구분, 지역 �
   });
   assert.equal(toPlace({ ...base, contenttypeid: '39' }).category, 'restaurant');
   assert.equal(toPlace({ ...base, contenttypeid: '32' }), null); // 숙박은 이 서비스 범위 밖
-  assert.equal(toPlace({ ...base, contenttypeid: '12', mapy: '35.1', mapx: '129.0' }), null); // 부산 좌표는 지역 밖
+  assert.equal(toPlace({ ...base, contenttypeid: '12', mapy: '35.68', mapx: '139.69' }), null); // 도쿄 좌표는 지역 밖
+  assert.equal(toPlace({ ...base, contenttypeid: '12', mapy: '35.1', mapx: '129.0' }).lat, 35.1); // 부산도 받는다
   assert.equal(toPlace({ ...base, contenttypeid: '12', mapx: '' }), null);
 });
 test('parseDetail: 관광지(실제 응답)', () => {
@@ -112,12 +115,12 @@ test('parseCommon: 실제 응답의 홈페이지 <a> 글자에서 주소만 꺼�
 
 // ---------- 카카오 로컬 ----------
 // 응답의 모양(필드 이름)은 실제 카카오 응답이고, 좌표·이름은 서울 값으로 바꾼 자료다.
-test('parseKakaoPlaces: x=경도 y=위도, 지하철역은 거점, 음식점 구분, 지역 밖(부산)은 제외', () => {
+test('parseKakaoPlaces: x=경도 y=위도, 지하철역은 거점, 음식점 구분, 지역 밖(도쿄)은 제외', () => {
   const body = JSON.stringify({
     documents: [
       { id: '8329752', place_name: '서울역', x: '126.97079', y: '37.55469', road_address_name: '서울 용산구 한강대로 405', category_group_code: '' },
       { id: '21160487', place_name: '서울역 1호선', x: '126.97236', y: '37.55589', address_name: '서울 중구 봉래동2가', category_group_code: 'SW8', phone: '1544-7788' },
-      { id: '999', place_name: '부산역', x: '129.0415', y: '35.1152' },
+      { id: '999', place_name: '도쿄역', x: '139.767', y: '35.681' },
       { id: '5', place_name: '식당', x: '126.98', y: '37.57', category_group_code: 'FD6' },
     ],
   });
@@ -223,6 +226,29 @@ test('parseTransitRides: 승·하차 정류장 좌표를 뽑는다(환승 뒤 �
   assert.deepEqual(ride.fromLoc, { lat: 37.4768, lng: 126.9817 });
   assert.deepEqual(ride.toLoc, { lat: 37.49795, lng: 127.027637 });
   assert.equal(ride.rideMinutes, 9);
+});
+
+test('transitRides: 지하철은 배차 간격을 어림하려고 다시 조회하고, 열차(KTX)는 어림하지 않는다', async () => {
+  const body = (type, line) => JSON.stringify({ routes: [{ legs: [{ steps: [{ transitDetails: {
+    stopDetails: { departureStop: { name: '서울' }, arrivalStop: { name: '도착' }, departureTime: '2026-10-19T01:30:00Z', arrivalTime: '2026-10-19T02:30:00Z' },
+    transitLine: { name: line, vehicle: { type } } } }] }] }] });
+  const originalFetch = globalThis.fetch;
+  const originalKey = process.env.GOOGLE_ROUTES_API_KEY;
+  process.env.GOOGLE_ROUTES_API_KEY = 'test-key';
+  try {
+    for (const [type, expectedCalls] of [['SUBWAY', 2], ['HEAVY_RAIL', 1], ['HIGH_SPEED_TRAIN', 1]]) {
+      let calls = 0;
+      globalThis.fetch = async () => { calls++; return { status: 200, text: async () => body(type, '노선') }; };
+      const [ride] = await transitRides({ lat: 37.55, lng: 126.97 }, { lat: 35.11, lng: 129.04 }, '2026-10-19T01:00:00Z');
+      assert.equal(calls, expectedCalls, type);
+      assert.equal(ride.headwayMinutes, null);
+      assert.equal('noEstimate' in ride, false);
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.GOOGLE_ROUTES_API_KEY;
+    else process.env.GOOGLE_ROUTES_API_KEY = originalKey;
+  }
 });
 
 test('kakaoCategory: 관광명소·문화시설은 여행지, 음식점·카페는 음식점, 나머지는 거점', () => {

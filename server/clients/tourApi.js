@@ -4,6 +4,7 @@
 // 필드 이름은 실제 응답으로 확인한 것: contentid, contenttypeid, title, addr1, mapx(경도), mapy(위도).
 import { upstream, rateLimit, notConfigured } from '../lib/errors.js';
 import { REGION_BOX } from '../lib/validate.js';
+import { rankPlaces } from '../lib/ranking.js';
 
 const BASE = 'https://apis.data.go.kr/B551011/KorService2/';
 const TYPE_ATTRACTION = '12';
@@ -116,12 +117,13 @@ async function callTour(operation, params) {
 export async function searchTour(query) {
   const [attractions, restaurants] = await Promise.all(
     [TYPE_ATTRACTION, TYPE_RESTAURANT].map((typeId) =>
-      // 전국에서 찾은 뒤 서울만 남기므로 넉넉히 받는다(같은 이름이 다른 지역에도 있을 수 있음)
+      // 지역 필터 없이 찾으므로 넉넉히 받는다(같은 이름이 여러 지역에 있을 수 있음)
       callTour('searchKeyword2', { keyword: query, contentTypeId: typeId, numOfRows: '30' }),
     ),
   );
   const places = [...attractions, ...restaurants].map(toPlace).filter(Boolean);
-  return places.slice(0, 12);
+  // 전국에서는 결과가 많아 잘라낼 때 관광지만 남을 수 있으므로, 이름이 잘 맞는 순서로 정렬한 뒤 자른다.
+  return rankPlaces(places, query).slice(0, 12);
 }
 
 // 소개 정보(쉬는 날·시간·주차·예약·문의)와 공통 정보(전화·홈페이지)를 함께 받아 합친다.

@@ -1,4 +1,4 @@
-// 카카오 로컬 키워드 검색: 역·터미널·숙소 등 출발지·도착지 후보. 서비스 지역(서울) 안으로만 찾는다.
+// 카카오 로컬 키워드 검색: 역·터미널·숙소 등 출발지·도착지 후보. 서비스 지역(대한민국) 안으로만 찾는다.
 // 필드: place_name, x(경도), y(위도), road_address_name, address_name, id, category_group_code
 import { upstream, rateLimit, notConfigured } from '../lib/errors.js';
 import { REGION_BOX } from '../lib/validate.js';
